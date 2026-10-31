@@ -1,0 +1,868 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="同人誌やグッズの費用を整理して、1冊の原価と、いくらで何部頒布すれば元が取れるかを出すツールです。記録はこの端末の中だけに保存されます。">
+<meta name="theme-color" content="#1f1d1b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="同人誌収支ツール">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.5 system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>同人誌収支ツール</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Maru+Gothic:wght@700;900&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* 執筆進捗管理表と同じ地と色。上に結果の帯、下へ 費用 → 頒布先 → ペイできるか → 実績 */
+:root{
+  --paper:#fbfaf7; --panel:#ffffff; --ink:#1f1d1b; --sub:#6b6560; --line:#e4e0da;
+  --accent:#1f62c9; --accent-ink:#1a52a8; --accent-soft:#e7effc; --accent-fg:#ffffff;
+  --field-bg:#ffffff; --field-line:#8a837c; --btn-line:#77716a; --btn-shadow:0 1px 0 rgba(0,0,0,.08);
+  --good:#2f8a5b; --good-soft:#e5f4e4; --bad:#c2453c; --bad-soft:#fbebeb; --book:#e8892b; --zebra:#f6f4f0;
+  --f-display:"Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#1a1918; --panel:#232120; --ink:#efebe6; --sub:#a39d96; --line:#36332f;
+  --accent:#6ea2f5; --accent-ink:#9cc0ff; --accent-soft:#1d2a3e; --accent-fg:#0f1b2d;
+  --field-bg:#161514; --field-line:#77716a; --btn-line:#8a837c; --btn-shadow:0 1px 0 rgba(0,0,0,.4);
+  --good:#5cc08a; --good-soft:#1c3226; --bad:#e8766d; --bad-soft:#3a1f1d; --book:#f09a45; --zebra:#1f1e1c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#1a1918; --panel:#232120; --ink:#efebe6; --sub:#a39d96; --line:#36332f;
+  --accent:#6ea2f5; --accent-ink:#9cc0ff; --accent-soft:#1d2a3e; --accent-fg:#0f1b2d;
+  --field-bg:#161514; --field-line:#77716a; --btn-line:#8a837c; --btn-shadow:0 1px 0 rgba(0,0,0,.4);
+  --good:#5cc08a; --good-soft:#1c3226; --bad:#e8766d; --bad-soft:#3a1f1d; --book:#f09a45; --zebra:#1f1e1c; color-scheme:dark}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6}
+.wrap{max-width:1040px;margin:0 auto;padding-block:20px 72px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:grid;gap:22px}
+h2{font-family:var(--f-display);font-size:18px;margin:0}
+h3{font-size:14px;margin:0}
+p{margin:0}
+.lead{font-size:13px;color:var(--sub)}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+input[type=date],input[type=text],input[type=number],select,textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--field-bg);border:1px solid var(--field-line);border-radius:4px;padding:5px 8px;min-width:0;max-width:100%;box-shadow:inset 0 1px 2px rgba(0,0,0,.08)}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);outline:none}
+input[type=number],input[type=date]{font-family:var(--f-num)}
+input[type=number]{text-align:right}
+input.req,select.req{border:2px solid var(--accent)}
+input.bad{border-color:var(--bad);background:var(--bad-soft)}
+.guide{display:flex;gap:10px;align-items:center;font-size:14px;font-weight:700}
+.guide .sw{flex:none;width:2.4rem;height:1.6rem;border:2px solid var(--accent);border-radius:4px;background:var(--field-bg)}
+::placeholder{color:var(--sub);opacity:.7}
+button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ghost{font:inherit;font-size:13px;font-weight:500;background:var(--panel);color:var(--ink);border:1.5px solid var(--btn-line);border-radius:8px;padding:5px 11px;cursor:pointer;white-space:nowrap;box-shadow:var(--btn-shadow)}
+.ghost:hover{border-color:var(--accent);background:var(--accent-soft)}
+.ghost:active,.btn:active{transform:translateY(1px);box-shadow:none}
+.ghost.danger{color:var(--bad);border-color:var(--bad)}
+..ghost.on{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft);font-weight:700}
+tr.setrow>td{padding:0 0 12px;border-bottom:1.5px solid var(--line)}
+.inline-set{position:sticky;left:0;width:min(900px,calc(100vw - 72px));border:1.5px solid var(--accent);border-radius:8px;padding:12px 14px;display:grid;gap:10px;background:var(--paper);white-space:normal}
+.inline-set .tbl-wrap{max-width:100%}
+.ghost.armed{background:var(--bad);color:#fff;border-color:var(--bad)}
+.btn{font:inherit;font-weight:700;background:var(--accent);color:var(--accent-fg);border:1.5px solid var(--accent);border-radius:8px;padding:7px 14px;cursor:pointer;box-shadow:var(--btn-shadow)}
+.x{border:0;background:transparent;color:var(--sub);cursor:pointer;font-size:15px;padding:2px 6px;border-radius:4px}
+.x:hover{color:var(--bad)}
+@media (pointer:coarse){.ghost,.btn{min-height:36px}}
+.acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* 帯 */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--band)}
+.band{position:sticky;top:env(safe-area-inset-top,0px);z-index:6;background:var(--band);color:var(--band-fg);box-shadow:0 2px 10px rgba(0,0,0,.12)}
+.band-in{max-width:1040px;margin:0 auto;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;align-items:center;gap:8px 18px;flex-wrap:wrap}
+.band .who{display:grid;min-width:0;flex:1 1 14rem}
+.band .eyebrow{font-size:11px;letter-spacing:.1em;opacity:.85}
+.band h1{font-family:var(--f-display);font-weight:900;font-size:20px;margin:0;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.band .now{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+.band .now div{display:grid;line-height:1.2}
+.band .now span{font-size:11px;opacity:.85}
+.band .now b{font-family:var(--f-num);font-size:20px;font-weight:500;white-space:nowrap}
+.band .helpbtn{font:inherit;font-size:13px;font-weight:700;background:transparent;color:inherit;border:1.5px solid currentColor;border-radius:999px;padding:4px 12px;cursor:pointer}
+@media (max-width:520px){.band h1{font-size:17px}.band .now b{font-size:17px}.band .now{gap:12px}}
+
+/* まとまり */
+section.card,details.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+section.card{padding:16px;display:grid;gap:12px}
+.sec-h{display:grid;gap:2px}
+details.card>summary{cursor:pointer;padding:12px 16px;font-family:var(--f-display);font-weight:700;font-size:16px;list-style:none;display:flex;justify-content:space-between;gap:8px;align-items:center}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary::after{content:"開く ▾";flex:none;font-family:var(--f-body);font-size:12px;font-weight:400;color:var(--sub)}
+details.card[open]>summary::after{content:"閉じる ▴"}
+.card-body{padding:0 16px 16px;display:grid;gap:16px}
+.note{background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:12px 16px;font-size:13px;display:grid;gap:4px}
+.warn{color:var(--bad);font-size:13px;font-weight:700}
+.okmsg{color:var(--good);font-weight:700}
+
+/* 入力の並び */
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px 16px}
+.field{display:grid;gap:3px;align-content:start}
+.field>label,.field>.k{font-size:12px;font-weight:700}
+.field .hint{font-size:12px;color:var(--sub)}
+.chk{display:flex;gap:6px;align-items:center;font-size:13px}
+.chk input{accent-color:var(--accent);width:16px;height:16px}
+.subopt{margin-left:9px;padding-left:16px;border-left:2px solid var(--line);display:grid;gap:6px}
+
+/* 表：全部の列を縦にそろえる */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.t{border-collapse:collapse;width:100%;font-size:13px}
+table.t th{font-size:12px;font-weight:700;color:var(--sub);text-align:left;padding:4px 6px;border-bottom:1.5px solid var(--line);white-space:nowrap}
+table.t td{padding:4px 6px;border-bottom:1px dashed var(--line);vertical-align:middle}
+table.t th.r,table.t td.r{text-align:right}
+table.t td.out{font-family:var(--f-num);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+table.t td.dash{color:var(--sub);text-align:center}
+table.t tfoot td{border-bottom:0;border-top:1.5px solid var(--line);font-weight:700}
+table.t input[type=text]{width:100%;min-width:8rem}
+table.t input[type=number]{width:6.5rem}
+table.t input.pct{width:4.5rem}
+table.t select{min-width:6rem}
+td.w-x{width:2rem;text-align:center}
+td.nw{white-space:nowrap}
+@media (max-width:560px){table.t input[type=number]{width:5.2rem}}
+
+/* 費用の分類 */
+.cats{display:grid;gap:8px}
+details.cat{border:1px solid var(--line);border-radius:8px}
+details.cat>summary{cursor:pointer;padding:8px 12px;list-style:none;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;font-weight:700;font-size:14px}
+details.cat>summary::-webkit-details-marker{display:none}
+details.cat>summary .sum{font-family:var(--f-num);font-weight:500}
+details.cat>summary::after{content:"開く ▾";font-size:12px;font-weight:400;color:var(--sub)}
+details.cat[open]>summary::after{content:"閉じる ▴"}
+.offtag{display:inline-block;font-size:11px;font-weight:700;color:var(--sub);border:1px solid var(--field-line);border-radius:999px;padding:0 8px;margin-left:4px}
+details.cat.off>summary .sum{color:var(--sub);text-decoration:line-through}
+details.cat .inner{padding:0 12px 10px;display:grid;gap:8px}
+.cat .desc{font-size:12px;color:var(--sub);font-weight:400}
+
+/* 結果 */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.tile{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:2px;align-content:start}
+.tile .k{font-size:12px;color:var(--sub)}
+.tile .v{font-family:var(--f-num);font-size:24px;line-height:1.25}
+.tile .v small{font-family:var(--f-body);font-size:13px;margin-left:2px}
+.tile .d{font-size:12px;color:var(--sub)}
+.tile.main{border-color:var(--accent);background:var(--accent-soft)}
+.tile.good{border-color:var(--good);background:var(--good-soft)}
+.tile.bad{border-color:var(--bad);background:var(--bad-soft)}
+tr.here td{background:var(--accent-soft)}
+.chart svg{width:100%;height:auto;display:block}
+.bar{height:12px;border-radius:999px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--good)}
+.stock{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px}
+.stock b{font-family:var(--f-num);font-weight:500}
+
+/* 共有画像 */
+.shareimg{max-width:100%;border:1px solid var(--line);border-radius:8px}
+textarea.io{width:100%;min-height:7rem;font-family:var(--f-num);font-size:12px}
+
+/* タブ：押せる形（枠＋影）、開いているタブは青 */
+.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tab{font:inherit;text-align:left;display:grid;gap:1px;background:var(--panel);color:var(--ink);border:1.5px solid var(--btn-line);border-radius:10px;padding:8px 12px;cursor:pointer;box-shadow:var(--btn-shadow)}
+.tab b{font-family:var(--f-display);font-size:16px}
+.tab span{font-size:12px;color:var(--sub)}
+.tab:hover{border-color:var(--accent)}
+.tab.on{border:2px solid var(--accent);background:var(--accent-soft);color:var(--accent-ink);box-shadow:none}
+.tab:active{transform:translateY(1px)}
+@media (max-width:520px){.tab{padding:6px 8px}.tab b{font-size:14px}.tab span{font-size:11px;line-height:1.35}}
+.pane{display:grid;gap:22px}
+.wrap>*,.pane>*,section.card>*,.card-body>*,.inner>*{min-width:0}
+.pick{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:end}
+.pick .field{flex:1 1 16rem}
+.pick select{width:100%;font-size:15px}
+.tbtn{font:inherit;font-size:13px;background:transparent;border:0;color:var(--accent-ink);padding:2px 4px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+
+/* 使い方 */
+.help{font-size:14px;display:grid;gap:12px}
+.help h3{font-size:15px;font-family:var(--f-display)}
+.help ul,.help ol{margin:4px 0 0;padding-left:1.3em;display:grid;gap:3px}
+</style>
+
+<div class="band" id="band"></div>
+<div class="wrap">
+  <div class="note" id="sampleNote" hidden>
+    <b>いま表示しているのはサンプルの数字です。</b>
+    <span>費用や価格は説明用の仮の値です。触って試したあと、下のボタンで空の状態から始められます。</span>
+    <div><button class="btn" data-act="fresh">サンプルを消して新しく始める</button></div>
+  </div>
+
+  <details class="card" id="mgmt">
+    <summary>保存と読み込み</summary>
+    <div class="card-body" id="mgmtBody"></div>
+  </details>
+
+  <p class="guide"><span class="sw" aria-hidden="true"></span><span>青い枠のマスだけ入れれば使えます。ほかは必要なときに入れてください。</span></p>
+  <nav class="tabs" id="tabs" aria-label="画面の切り替え"></nav>
+
+  <div class="pane" id="tab-item">
+    <section class="card" id="secPick1"></section>
+    <section class="card" id="secInfo"></section>
+    <section class="card" id="secCost"></section>
+    <section class="card" id="secTry"></section>
+  </div>
+  <div class="pane" id="tab-place" hidden>
+    <section class="card" id="secPlaces"></section>
+  </div>
+  <div class="pane" id="tab-plan" hidden>
+    <section class="card" id="secPick3"></section>
+    <section class="card" id="secCh"></section>
+    <section class="card" id="secAlloc"></section>
+    <section class="card" id="secPay"></section>
+    <section class="card" id="secByCh"></section>
+    <section class="card" id="secActual"></section>
+    <section class="card" id="secShare"></section>
+  </div>
+
+  <details class="card" id="helpBox">
+    <summary>使い方</summary>
+    <div class="card-body help" id="helpBody"></div>
+  </details>
+</div>
+
+<script>
+"use strict";
+const KEY = "doujin-shushi-v1";
+const TOOL = "同人誌収支ツール";
+const uid = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const n = v => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
+const yen = v => Math.round(v).toLocaleString("ja-JP") + "円";
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
+/* ── 頒布先の種類と手数料 ── */
+const TYPES = {
+  event: { label: "イベント", paper: { mode: "none" }, ebook: null, costs: ["サークル参加費", "交通費", "宿泊費", "宅配搬入・搬出"] },
+  shop: { label: "書店委託", paper: { mode: "rate", rate: 70 }, ebook: { mode: "rate", rate: 70 }, costs: ["納品の送料"] },
+  mail: { label: "自家通販", paper: { mode: "booth" }, ebook: { mode: "booth" }, costs: ["梱包資材", "発送費（自分で負担する分）"] },
+  dl: { label: "電子のみ", paper: null, ebook: { mode: "rate", rate: 70 }, costs: [] },
+};
+const FEE_MODES = {
+  none: "手数料なし",
+  rate: "取り分の率（掛け率）",
+  booth: "BOOTH（5.6%＋45円）",
+  boothwh: "BOOTH倉庫（＋2.5%＋25円）",
+  fixed: "率＋1件あたりの額",
+};
+function net(fee, price) {
+  price = n(price);
+  if (!fee || !price) return 0;
+  switch (fee.mode) {
+    case "none": return price;
+    case "rate": return Math.round(price * n(fee.rate) / 100);
+    case "booth": return Math.round(price - (price * 0.056 + 45));
+    case "boothwh": return Math.round(price - (price * 0.056 + 45) - (price * 0.025 + 25));
+    case "fixed": return Math.round(price * (100 - n(fee.rate)) / 100 - n(fee.fixed));
+  }
+  return price;
+}
+
+/* ── 費用の分類（頒布物ごと） ── */
+const CATS = [
+  { key: "print", label: "印刷", desc: "印刷費・オプション・搬入や送料", items: ["印刷費", "オプション（特殊紙・加工）", "搬入・送料"] },
+  { key: "make", label: "制作", desc: "画材・ソフト・フォント・資料・外注", items: ["画材・ソフト", "フォント・素材", "資料", "デザイン・ロゴ外注"] },
+  { key: "guest", label: "ゲスト", desc: "献本の送料やお礼。献本の部数は頒布物の情報で", items: ["献本の送料", "お礼の品"] },
+  { key: "bonus", label: "ノベルティ・特典", desc: "ペーパー・ステッカーなど配るもの", items: ["ペーパー", "ステッカー・ポストカード"] },
+  { key: "booth", label: "スペース設営", desc: "何度も使うものは「この頒布物に」に％を入れて割る", items: ["ポスター・お品書き", "敷布・什器", "OPP袋"] },
+  { key: "ad", label: "宣伝", desc: "広告・サンプル配布物", items: ["広告・サンプル配布物"] },
+  { key: "dist", label: "頒布にかかる費用（かんたん用）", desc: "参加費・交通費など。頒布先を選ぶと計画と収支では使いません", items: ["サークル参加費", "交通費", "宿泊費", "委託・通販の送料"] },
+  { key: "other", label: "その他", desc: "自由に足してください", items: [] },
+];
+const COLORS = ["#e8892b", "#c8306a", "#2f6fd0", "#2f8a5b", "#8456c9", "#9a6000", "#1f1d1b"];
+
+const newCosts = () => CATS.flatMap(c => c.items.map(name => ({ id: uid(), cat: c.key, name, amount: "", paid: false, share: "", memo: "" })));
+const newProduct = (kind = "book", name = "") => ({
+  id: uid(), name: name || (kind === "book" ? "新しい本" : "新しいグッズ"), kind, size: kind === "book" ? "B5" : "", pages: "",
+  qty: "", keep: "", printer: "", tryPrice: "", tryFee: "", ebook: false, track: false, color: COLORS[0], costs: newCosts(), chans: [], sales: [],
+});
+const newChannel = (type = "event", name = "") => ({
+  id: uid(), name: name || TYPES[type].label, type, date: "",
+  paper: TYPES[type].paper ? { ...TYPES[type].paper } : null,
+  ebook: TYPES[type].ebook ? { ...TYPES[type].ebook } : null,
+  costs: TYPES[type].costs.map(nm => ({ id: uid(), name: nm, amount: "" })), alloc: {},
+});
+
+function sample() {
+  const c109 = newChannel("event", "イベントA（サンプル）"); c109.date = "2026-12-30";
+  c109.costs[0].amount = 10000; c109.costs[1].amount = 2000; c109.costs[3].amount = 3000;
+  const lf = newChannel("event", "地方イベント（サンプル）"); lf.costs[0].amount = 6000; lf.costs[1].amount = 14000;
+  const booth = newChannel("mail", "BOOTH"); booth.costs[0].amount = 1600;
+  const melon = newChannel("shop", "メロンブックス"); melon.costs[0].amount = 1500;
+  const book = newProduct("book", "本のタイトル（サンプル）");
+  Object.assign(book, { pages: 44, qty: 200, keep: 10, printer: "〇〇印刷 早割セット（サンプル）", ebook: true, tryPrice: 500 });
+  const pc = book.costs.find(c => c.name === "印刷費"); pc.amount = 62000;
+  book.costs.find(c => c.name === "ポスター・お品書き").amount = 4000;
+  book.costs.find(c => c.name === "ポスター・お品書き").share = 50;
+  book.costs.find(c => c.name === "献本の送料").amount = 1200;
+  book.chans = [
+    { ch: c109.id, pp: 500, pn: 100, ep: "", en: "" },
+    { ch: lf.id, pp: 600, pn: 30, ep: "", en: "" },
+    { ch: booth.id, pp: 700, pn: 20, ep: 500, en: 15 },
+    { ch: melon.id, pp: 800, pn: 40, ep: 600, en: 15 },
+  ];
+  const goods = newProduct("goods", "アクスタ（サンプル）");
+  Object.assign(goods, { qty: 30, color: COLORS[1], tryPrice: 1500 });
+  goods.costs.unshift({ id: uid(), cat: "print", name: "製作費", amount: 24000, paid: false, share: "", memo: "" });
+  goods.costs = goods.costs.filter(c => c.name !== "印刷費");
+  goods.chans = [{ ch: c109.id, pp: 1500, pn: 25, ep: "", en: "" }];
+  return { products: [book, goods], channels: [c109, lf, booth, melon], current: book.id, sample: true, tab: "item" };
+}
+
+let S;
+function load() {
+  try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); if (S && S.products?.length) { migrate(); return; } } } catch (_) {}
+  S = sample();
+}
+function migrate() {
+  S.products.forEach(p => { if (!p.costs.some(c => c.cat === "dist")) CATS.find(c => c.key === "dist").items.forEach(name => p.costs.push({ id: uid(), cat: "dist", name, amount: "", paid: false, share: "", memo: "" })); });
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (_) {} }
+const P = () => S.products.find(p => p.id === S.current) || S.products[0];
+const CH = id => S.channels.find(c => c.id === id);
+
+/* ── 計算 ── */
+function chanNets(row) {
+  const ch = CH(row.ch); if (!ch) return { pn: 0, en: 0 };
+  return { pn: ch.paper ? net(ch.paper, row.pp) : 0, en: ch.ebook ? net(ch.ebook, row.ep) : 0 };
+}
+// 頒布先の費用を、そこで頒布する頒布物に割り振る
+function allocOf(ch) {
+  const users = S.products.filter(p => p.chans.some(r => r.ch === ch.id));
+  const w = {}, manual = {};
+  users.forEach(p => {
+    const r = p.chans.find(r => r.ch === ch.id), x = chanNets(r);
+    w[p.id] = x.pn * n(r.pn) + (p.ebook ? x.en * n(r.en) : 0);
+    const m = ch.alloc[p.id]; if (m !== "" && m != null && Number.isFinite(Number(m))) manual[p.id] = Number(m);
+  });
+  const mSum = Object.values(manual).reduce((a, b) => a + b, 0);
+  const autos = users.filter(p => !(p.id in manual));
+  const wSum = autos.reduce((a, p) => a + w[p.id], 0);
+  const rest = Math.max(0, 100 - mSum), out = {};
+  users.forEach(p => {
+    out[p.id] = p.id in manual ? manual[p.id] : autos.length ? (wSum > 0 ? rest * w[p.id] / wSum : rest / autos.length) : 0;
+  });
+  return { pct: out, total: ch.costs.reduce((a, c) => a + n(c.amount), 0), over: mSum > 100 };
+}
+function calc(p) {
+  const part = c => n(c.amount) * (c.share === "" || c.share == null ? 100 : n(c.share)) / 100;
+  // かんたん用の頒布費用は、頒布先を選んだら計画と収支では数えない（頒布先タブの費用と二重にしない）
+  const ownQuick = p.costs.reduce((a, c) => a + part(c), 0);
+  const distSum = p.costs.filter(c => c.cat === "dist").reduce((a, c) => a + part(c), 0);
+  const distOff = p.chans.length > 0;
+  const own = ownQuick - (distOff ? distSum : 0);
+  const print = p.costs.filter(c => c.cat === "print").reduce((a, c) => a + n(c.amount) * (c.share === "" || c.share == null ? 100 : n(c.share)) / 100, 0);
+  const chCost = {};
+  let chTotal = 0;
+  p.chans.forEach(r => { const ch = CH(r.ch); if (!ch) return; const a = allocOf(ch); chCost[ch.id] = a.total * (a.pct[p.id] || 0) / 100; chTotal += chCost[ch.id]; });
+  const total = own + chTotal, qty = n(p.qty), sellable = Math.max(0, qty - n(p.keep));
+  let planRev = 0, planN = 0, planPaper = 0;
+  p.chans.forEach(r => { const x = chanNets(r); planRev += x.pn * n(r.pn); planN += n(r.pn); planPaper += n(r.pn); if (p.ebook) { planRev += x.en * n(r.en); planN += n(r.en); } });
+  const avg = planN ? planRev / planN : 0;
+  const be = avg > 0 ? Math.ceil(total / avg) : null;
+  // 実績
+  // 納品した先（書店委託・倉庫）で売れた分は委託先の在庫から、それ以外は手元から減らす
+  let got = 0, sold = 0, sentOut = 0, soldHome = 0; const perCh = {}, perNet = {}, atShop = {};
+  const dated = p.sales.filter(s => s.date), undated = p.sales.length - dated.length;
+  const away = new Set(dated.filter(s => s.kind === "send").map(s => s.ch));
+  S.channels.forEach(c => { if (c.type === "shop") away.add(c.id); });
+  dated.forEach(s => {
+    const ch = CH(s.ch); if (!ch) return;
+    const q = n(s.qty);
+    if (s.kind === "send") { sentOut += q; atShop[ch.id] = (atShop[ch.id] || 0) + q; return; }
+    got += net(s.form === "ebook" ? ch.ebook : ch.paper, s.price) * q; sold += q;
+    perCh[ch.id] = (perCh[ch.id] || 0) + q;
+    perNet[ch.id] = (perNet[ch.id] || 0) + net(s.form === "ebook" ? ch.ebook : ch.paper, s.price) * q;
+    if (s.form === "ebook") return;
+    if (away.has(ch.id)) atShop[ch.id] = (atShop[ch.id] || 0) - q; else soldHome += q;
+  });
+  const inShops = Object.values(atShop).reduce((a, b) => a + Math.max(0, b), 0);
+  const hand = sellable - sentOut - soldHome;
+  return { own, ownQuick, distSum, distOff, unitQuick: qty ? ownQuick / qty : 0, print, chCost, chTotal, total, qty, sellable, planRev, planN, planPaper, avg, be, profit: planRev - total,
+    unitPrint: qty ? print / qty : 0, unitOwn: qty ? own / qty : 0, unitAll: qty ? total / qty : 0, make: ownQuick - distSum, unitMake: qty ? (ownQuick - distSum) / qty : 0, got, sold, perCh, perNet, atShop, hand, inShops, remain: total - got, undated };
+}
+
+/* ── 描画 ── */
+const $ = id => document.getElementById(id);
+function fgFor(hex) { const h = hex.replace("#", ""); const r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16); return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? "#1f1d1b" : "#ffffff"; }
+const KIND = p => (p.kind === "book" ? "本" : "グッズ");
+const TABS = [
+  { key: "item", label: "頒布物", sub: "費用と原価・かんたん試算" },
+  { key: "place", label: "頒布先", sub: "イベント・委託・通販の設定" },
+  { key: "plan", label: "計画と収支", sub: "どこでいくらで何部・実績" },
+];
+const tab = () => (TABS.some(t => t.key === S.tab) ? S.tab : "item");
+
+function renderBand() {
+  const p = P(), r = calc(p);
+  document.documentElement.style.setProperty("--band", p.color);
+  document.documentElement.style.setProperty("--band-fg", fgFor(p.color));
+  let last;
+  if (p.track && p.sales.length) last = r.remain <= 0 ? `<div><span>実績</span><b>元が取れました</b></div>` : `<div><span>元が取れるまで</span><b>${yen(r.remain)}</b></div>`;
+  else if (!p.chans.length && n(p.tryPrice)) { const t = n(p.tryPrice) * (100 - Math.min(100, n(p.tryFee))) / 100; last = `<div><span>元が取れる部数（かんたん）</span><b>${t > 0 && r.ownQuick ? Math.ceil(r.ownQuick / t) + "部" : "―"}</b></div>`; }
+  else last = `<div><span>元が取れる部数</span><b>${r.be == null ? "―" : r.be + "部"}</b></div>`;
+  $("band").innerHTML = `<div class="band-in"><div class="who"><span class="eyebrow">${TOOL}</span><h1>${esc(p.name)}</h1></div>
+    <div class="now"><div><span>費用の合計</span><b>${yen(r.total)}</b></div><div><span>1冊の原価</span><b>${r.qty ? yen(r.unitMake) : "―"}</b></div>${last}</div>
+    <button class="helpbtn" data-act="help">使い方</button></div>`;
+  $("sampleNote").hidden = !S.sample;
+}
+
+function renderTabs() {
+  const t = tab();
+  $("tabs").innerHTML = TABS.map(x => `<button class="tab ${x.key === t ? "on" : ""}" data-act="tab" data-v="${x.key}" aria-pressed="${x.key === t}"><b>${x.label}</b><span>${x.sub}</span></button>`).join("");
+  TABS.forEach(x => { $("tab-" + x.key).hidden = x.key !== t; });
+}
+
+function pickHTML(id) {
+  const p = P();
+  return `<div class="pick"><div class="field"><label for="${id}">表示している頒布物</label>
+    <select id="${id}" data-pick="1">${S.products.map(x => `<option value="${x.id}" ${x.id === p.id ? "selected" : ""}>${esc(x.name)}（${KIND(x)}）</option>`).join("")}</select></div>
+    <div class="acts"><button class="ghost" data-act="addBook">＋ 本を足す</button><button class="ghost" data-act="addGoods">＋ グッズを足す</button></div></div>`;
+}
+
+function renderMgmt() {
+  $("mgmtBody").innerHTML = `
+  <div class="field"><span class="k">執筆進捗管理表から読み込む</span>
+    <span class="hint">進捗管理表で「書き出し」たファイルを選ぶと、タイトル・ページ数・本の色・イベントを取り込んで新しい頒布物を作ります。イベントは頒布先にも入ります。</span>
+    <input type="file" id="m-prog" accept=".json,application/json"></div>
+  <div class="field"><span class="k">記録の書き出しと読み込み</span>
+    <span class="hint">記録はこのブラウザに自動で保存されます。別の端末に移すときは、書き出した文字をコピーして、移した先の欄に貼り付けて「読み込む」を押します。</span>
+    <div class="acts"><button class="ghost" data-act="export">書き出す</button><button class="ghost" data-act="import">貼り付けた内容を読み込む</button><button class="ghost danger" data-act="reset" id="resetBtn">サンプルに戻す</button></div>
+    <textarea class="io" id="m-io" placeholder="ここに書き出した内容が出ます。読み込むときはここに貼り付けてください。"></textarea></div>`;
+}
+
+/* 頒布物タブ */
+function renderInfo() {
+  const p = P();
+  $("secInfo").innerHTML = `<div class="sec-h"><h2>頒布物の情報</h2><p class="lead">作った数は必ず入れてください。1冊の原価と、売れる部数の計算に使います。</p></div>
+  <div class="form">
+    <div class="field"><label for="i-name">名前</label><input type="text" id="i-name" class="req" data-f="p.name" value="${esc(p.name)}"></div>
+    <div class="field"><label for="i-kind">種類</label><select id="i-kind" data-f="p.kind" data-re="1"><option value="book" ${p.kind === "book" ? "selected" : ""}>本</option><option value="goods" ${p.kind === "goods" ? "selected" : ""}>グッズ</option></select></div>
+    ${p.kind === "book" ? `<div class="field"><label for="i-size">判型</label><input type="text" id="i-size" data-f="p.size" value="${esc(p.size)}" placeholder="B5"></div>
+    <div class="field"><label for="i-pages">ページ数</label><input type="number" id="i-pages" data-f="p.pages" value="${esc(p.pages)}" inputmode="numeric" placeholder="44"></div>` : ""}
+    <div class="field"><label for="i-qty">作った数（${p.kind === "book" ? "印刷部数" : "製作数"}）</label><input type="number" id="i-qty" data-f="p.qty" value="${esc(p.qty)}" inputmode="numeric" class="req" placeholder="200"></div>
+    <div class="field"><label for="i-keep">売らない数</label><input type="number" id="i-keep" data-f="p.keep" value="${esc(p.keep)}" inputmode="numeric" placeholder="10"><span class="hint">献本・見本・保存用など</span></div>
+    <div class="field"><label for="i-printer">印刷所・メモ</label><input type="text" id="i-printer" data-f="p.printer" value="${esc(p.printer)}"></div>
+    <div class="field"><span class="k">帯の色</span><div class="acts">${COLORS.map(c => `<button class="x" data-act="color" data-v="${c}" aria-label="色 ${c}" style="width:26px;height:26px;border-radius:50%;background:${c};border:2px solid ${c === p.color ? "var(--ink)" : "var(--panel)"};box-shadow:0 0 0 1px var(--line)"></button>`).join("")}</div></div>
+  </div>
+  <div class="acts"><label class="chk"><input type="checkbox" data-f="p.ebook" data-re="1" ${p.ebook ? "checked" : ""}>電子版もある</label>
+    <span style="flex:1"></span><button class="ghost" data-act="dup">この頒布物を複製</button><button class="ghost danger" data-act="del" id="delBtn">この頒布物を消す</button></div>`;
+}
+
+const catSum = (p, key) => p.costs.filter(x => x.cat === key).reduce((a, x) => a + n(x.amount) * (x.share === "" || x.share == null ? 100 : n(x.share)) / 100, 0);
+function renderCost() {
+  const p = P(), r = calc(p);
+  const cats = CATS.map(c => {
+    const rows = p.costs.filter(x => x.cat === c.key);
+    const reqId = c.key === "print" && rows[0] ? rows[0].id : null;
+    const ck = p.id + ":" + c.key;
+    const open = catOpen.has(ck) ? catOpen.get(ck) : c.key === "print" || c.key === "dist" || rows.some(x => n(x.amount));
+    const off = c.key === "dist" && p.chans.length > 0;
+    return `<details class="cat ${off ? "off" : ""}" data-cat="${ck}" ${open ? "open" : ""}><summary><span>${c.label} <span class="desc">${c.desc}</span>${off ? ` <span class="offtag">計画と収支では使っていません（頒布先タブの費用を使っています）</span>` : ""}</span><span class="sum" data-out="cat:${c.key}">${yen(catSum(p, c.key))}</span></summary>
+    <div class="inner"><div class="tbl-wrap"><table class="t"><thead><tr><th>項目</th><th class="r">金額</th><th>状態</th><th class="r">この頒布物に</th><th>メモ</th><th></th></tr></thead><tbody>
+    ${rows.map(x => `<tr><td><input type="text" data-f="cost:${x.id}:name" value="${esc(x.name)}" aria-label="項目名"></td>
+      <td class="r"><input type="number" class="${x.id === reqId ? "req" : ""}" data-f="cost:${x.id}:amount" value="${esc(x.amount)}" inputmode="numeric" placeholder="0" aria-label="金額"></td>
+      <td><select data-f="cost:${x.id}:paid" aria-label="状態"><option value="" ${x.paid ? "" : "selected"}>試算</option><option value="1" ${x.paid ? "selected" : ""}>支払済</option></select></td>
+      <td class="r nw"><input type="number" class="pct" data-f="cost:${x.id}:share" value="${esc(x.share)}" inputmode="numeric" placeholder="100" aria-label="この頒布物に何％">%</td>
+      <td><input type="text" data-f="cost:${x.id}:memo" value="${esc(x.memo)}" aria-label="メモ"></td>
+      <td class="w-x"><button class="x" data-act="delCost" data-id="${x.id}" aria-label="この行を消す">×</button></td></tr>`).join("")}
+    </tbody></table></div><div><button class="ghost" data-act="addCost" data-cat="${c.key}">＋ 項目を足す</button></div></div></details>`;
+  }).join("");
+  $("secCost").innerHTML = `<div class="sec-h"><h2>費用</h2><p class="lead">この頒布物にかかった費用です。入れたい項目だけ入れれば大丈夫です。何度も使うもの（敷布など）は「この頒布物に」に％を入れると、その分だけ数えます。空欄は100%です。参加費や交通費は、パッと試算するなら「頒布にかかる費用（かんたん用）」に入れてください。イベントや委託と組み合わせて考えるときは「頒布先」タブで入れます。</p></div>
+  <div class="cats">${cats}</div>
+  <div class="tbl-wrap"><table class="t"><tbody>
+  <tr><td><b>この頒布物の費用の合計</b></td><td class="out" data-out="ownQuick"><b>${yen(r.ownQuick)}</b></td></tr>
+  <tr><td>うち作る費用（頒布にかかる費用を除く）</td><td class="out" data-out="make">${yen(r.make)}</td></tr>
+  <tr><td>1冊の原価（印刷だけ／作る費用すべて）</td><td class="out" data-out="unitMake">${r.qty ? yen(r.unitPrint) + "／" + yen(r.unitMake) : "作った数を入れてください"}</td></tr></tbody></table></div>
+  <p class="lead">1冊の原価は作る費用だけで出します。参加費や交通費など頒布にかかる費用は、あとからイベントが増えても、すでに頒布した本の原価が変わらないように分けています。</p>`;
+}
+const catOpen = new Map();
+
+function renderTry() {
+  const p = P();
+  $("secTry").innerHTML = `<div class="sec-h"><h2>かんたん試算</h2><p class="lead">価格を入れると、1冊あたりいくら残るか（価格 − 1冊の原価）と、何部頒布すれば元が取れるか（上の費用すべてを回収できるか。かんたん用の頒布費用も含む）が出ます。委託や通販の手数料をざっくり引きたいときは手数料に％を入れてください。頒布先ごとにきちんと分けて考えるときは「計画と収支」タブを使います。</p></div>
+  <div class="form"><div class="field"><label for="t-price">価格</label><input type="number" id="t-price" class="req" data-f="p.tryPrice" value="${esc(p.tryPrice)}" inputmode="numeric" placeholder="500"></div>
+    <div class="field"><label for="t-fee">手数料（%）</label><input type="number" id="t-fee" data-f="p.tryFee" value="${esc(p.tryFee)}" inputmode="decimal" placeholder="0"><span class="hint">イベントの手売りだけなら空欄</span></div></div>
+  <div id="tryOut"></div>`;
+  renderTryOut();
+}
+function renderTryOut() {
+  const p = P(), r = calc(p), el = $("tryOut"); if (!el) return;
+  const price = n(p.tryPrice);
+  if (!price || !r.qty) { el.innerHTML = `<p class="lead">${!r.qty ? "「作った数」と" : ""}価格を入れると、ここに結果が出ます。</p>`; return; }
+  const fee = Math.min(100, Math.max(0, n(p.tryFee))), get = v => v * (100 - fee) / 100, take = get(price);
+  const left = take - r.unitMake, back = r.ownQuick && take > 0 ? Math.ceil(r.ownQuick / take) : 0, all = take * r.sellable - r.ownQuick;
+  const over = r.sellable && back > r.sellable;
+  const prices = [-200, -100, 0, 100, 200, 300].map(d => price + d).filter(v => v > 0);
+  el.innerHTML = `<div class="tiles">
+    <div class="tile ${left >= 0 ? "main" : "bad"}"><span class="k">1冊あたり残る額</span><span class="v">${left >= 0 ? "" : "−"}${yen(Math.abs(left))}</span><span class="d">${fee ? `手取り ${yen(take)}（手数料${fee}%）` : `価格 ${yen(price)}`} − 1冊の原価 ${yen(r.unitMake)}</span></div>
+    <div class="tile ${over ? "bad" : ""}"><span class="k">元が取れる部数</span><span class="v">${back}<small>部</small></span><span class="d">${r.sellable ? `売れる部数 ${r.sellable}部のうち ${Math.round(back / r.sellable * 100)}%` : ""}</span>${over ? `<span class="warn">売れる部数を超えています</span>` : ""}</div>
+    <div class="tile ${all >= 0 ? "good" : "bad"}"><span class="k">売り切ったら</span><span class="v">${all >= 0 ? "+" : "−"}${yen(Math.abs(all))}</span><span class="d">${r.sellable}部 × ${yen(take)} − 費用 ${yen(r.ownQuick)}</span></div></div>
+  <h3>価格ごとの早見表</h3>
+  <div class="tbl-wrap"><table class="t"><thead><tr><th class="r">価格</th><th class="r">1冊あたり残る額</th><th class="r">元が取れる部数</th><th class="r">売れる部数のうち</th><th class="r">売り切ったら</th></tr></thead><tbody>
+  ${prices.map(v => { const t = get(v), b = r.ownQuick && t > 0 ? Math.ceil(r.ownQuick / t) : 0, a = t * r.sellable - r.ownQuick, l = t - r.unitMake;
+    return `<tr class="${v === price ? "here" : ""}"><td class="out">${yen(v)}</td><td class="out" style="color:${l >= 0 ? "inherit" : "var(--bad)"}">${l >= 0 ? "" : "−"}${yen(Math.abs(l))}</td><td class="out">${b}部</td><td class="out">${r.sellable ? Math.round(b / r.sellable * 100) + "%" : "―"}</td><td class="out" style="color:${a >= 0 ? "var(--good)" : "var(--bad)"}">${a >= 0 ? "+" : "−"}${yen(Math.abs(a))}</td></tr>`; }).join("")}
+  </tbody></table></div><p class="lead">色の付いた行が入れた価格です。${fee ? `どの価格も手数料${fee}%を引いて計算しています。` : ""}</p>`;
+}
+
+/* 頒布先タブ */
+function feeText(fee) {
+  if (!fee) return "―";
+  if (fee.mode === "rate") return `取り分${n(fee.rate)}%`;
+  if (fee.mode === "fixed") return `${n(fee.rate)}%＋${n(fee.fixed)}円`;
+  return FEE_MODES[fee.mode].replace(/（.*）/, "");
+}
+function chSettings(ch) {
+  const users = S.products.filter(p => p.chans.some(r => r.ch === ch.id));
+  const feeSel = (side, fee) => fee ? `<div class="field"><label>${side === "paper" ? "紙" : "電子"}の手数料</label><select data-f="chfee:${ch.id}:${side}:mode" data-re="1">${Object.entries(FEE_MODES).map(([k, v]) => `<option value="${k}" ${fee.mode === k ? "selected" : ""}>${v}</option>`).join("")}</select>
+    ${fee.mode === "rate" ? `<div class="subopt"><label class="chk">取り分 <input type="number" class="pct" data-f="chfee:${ch.id}:${side}:rate" value="${esc(fee.rate)}" style="width:4.5rem">%</label></div>` : ""}
+    ${fee.mode === "fixed" ? `<div class="subopt"><label class="chk">手数料 <input type="number" data-f="chfee:${ch.id}:${side}:rate" value="${esc(fee.rate)}" style="width:4.5rem">% ＋ <input type="number" data-f="chfee:${ch.id}:${side}:fixed" value="${esc(fee.fixed)}" style="width:5rem">円</label></div>` : ""}</div>` : "";
+  return `<div class="form"><div class="field"><label>名前</label><input type="text" data-f="ch:${ch.id}:name" value="${esc(ch.name)}"></div>
+      <div class="field"><label>日付</label><input type="date" data-f="ch:${ch.id}:date" value="${esc(ch.date)}"></div>
+      ${feeSel("paper", ch.paper)}${feeSel("ebook", ch.ebook)}</div>
+    <h3>この頒布先にかかる費用</h3>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th>項目</th><th class="r">金額</th><th></th></tr></thead><tbody>
+    ${ch.costs.map(c => `<tr><td><input type="text" data-f="chcost:${ch.id}:${c.id}:name" value="${esc(c.name)}" aria-label="項目名"></td><td class="r"><input type="number" data-f="chcost:${ch.id}:${c.id}:amount" value="${esc(c.amount)}" inputmode="numeric" placeholder="0" aria-label="金額"></td><td class="w-x"><button class="x" data-act="delChCost" data-ch="${ch.id}" data-id="${c.id}" aria-label="この行を消す">×</button></td></tr>`).join("")}
+    <tr><td>合計</td><td class="out" data-out="rc2:${ch.id}">${yen(allocOf(ch).total)}</td><td></td></tr>
+    </tbody></table></div><div><button class="ghost" data-act="addChCost" data-ch="${ch.id}">＋ 項目を足す</button></div>
+    <p class="lead">この頒布先で頒布する予定の頒布物：${users.length ? users.map(p => esc(p.name)).join("、") : "まだありません（「計画と収支」タブで選べます）"}</p>
+    <div><button class="ghost danger" data-act="delCh" data-id="${ch.id}">この頒布先を消す</button></div>`;
+}
+function renderPlaces() {
+  $("secPlaces").innerHTML = `<div class="sec-h"><h2>頒布先</h2><p class="lead">イベント・書店委託・自家通販・電子書籍の販売サイトなど、頒布する場所を登録します。手数料と、参加費・交通費などその場所にかかる費用はここで入れます。どの頒布物をいくらで何部頒布するかは「計画と収支」タブで決めます。手数料の初期値は2026年10月時点の公開情報です。書店委託の掛け率は契約によって違うので、自分の契約の値に直してください。</p></div>
+  <div class="acts"><select id="c-newtype" aria-label="新しい頒布先の種類">${Object.entries(TYPES).map(([k, t]) => `<option value="${k}">${t.label}</option>`).join("")}</select>
+    <input type="text" id="c-newname" placeholder="名前（例：C109 2日目）" aria-label="新しい頒布先の名前">
+    <button class="btn" data-act="newCh">＋ 頒布先を登録</button></div>
+  <div class="cats">${S.channels.map(ch => `<details class="cat" ${openRoster.has(ch.id) ? "open" : ""} data-roster="${ch.id}" id="place-${ch.id}"><summary><span>${esc(ch.name)} <span class="desc">${TYPES[ch.type].label}${ch.date ? "・" + esc(ch.date) : ""}・紙 ${feeText(ch.paper)}${ch.ebook ? "・電子 " + feeText(ch.ebook) : ""}</span></span><span class="sum" data-out="rc:${ch.id}">${yen(allocOf(ch).total)}</span></summary>
+    <div class="inner">${chSettings(ch)}</div></details>`).join("") || `<p class="lead">まだ頒布先がありません。上で種類と名前を入れて登録してください。</p>`}</div>`;
+}
+const openRoster = new Set();
+
+/* 計画と収支タブ */
+function renderCh() {
+  const p = P(), eb = p.ebook;
+  const rows = p.chans.map(row => {
+    const ch = CH(row.ch); if (!ch) return "";
+    const x = chanNets(row);
+    const pc = ch.paper ? `<td class="r"><input type="number" class="req" data-f="pch:${ch.id}:pp" value="${esc(row.pp)}" inputmode="numeric" aria-label="紙の価格"></td><td class="r"><input type="number" class="req" data-f="pch:${ch.id}:pn" value="${esc(row.pn)}" inputmode="numeric" aria-label="紙の予定数"></td><td class="out" data-out="pn:${ch.id}">${row.pp ? yen(x.pn) : "―"}</td>` : `<td class="dash">―</td><td class="dash">―</td><td class="dash">―</td>`;
+    const ec = !eb ? "" : ch.ebook ? `<td class="r"><input type="number" class="${ch.paper ? "" : "req"}" data-f="pch:${ch.id}:ep" value="${esc(row.ep)}" inputmode="numeric" aria-label="電子の価格"></td><td class="r"><input type="number" class="${ch.paper ? "" : "req"}" data-f="pch:${ch.id}:en" value="${esc(row.en)}" inputmode="numeric" aria-label="電子の予定数"></td><td class="out" data-out="en:${ch.id}">${row.ep ? yen(x.en) : "―"}</td>` : `<td class="dash">―</td><td class="dash">―</td><td class="dash">―</td>`;
+    return `<tr><td class="nw">${esc(ch.name)}</td><td class="nw">${TYPES[ch.type].label}</td>${pc}${ec}<td class="nw"><button class="tbtn" data-act="goPlace" data-id="${ch.id}">${feeText(ch.paper || ch.ebook)}</button></td><td class="w-x"><button class="x" data-act="unlink" data-id="${ch.id}" aria-label="この頒布物の計画から外す">×</button></td></tr>`;
+  }).join("");
+  const unused = S.channels.filter(c => !p.chans.some(r => r.ch === c.id) && (c.paper || eb));
+  $("secCh").innerHTML = `<div class="sec-h"><h2>頒布先ごとの価格と部数</h2><p class="lead">この頒布物を、どの頒布先で、いくらで、何部頒布する予定かを入れます。手取りは手数料を引いた額です。手数料を押すと「頒布先」タブのその頒布先が開きます。</p></div>
+  <div class="tbl-wrap"><table class="t"><thead><tr><th>頒布先</th><th>種類</th><th class="r">紙の価格</th><th class="r">紙の予定数</th><th class="r">紙の手取り/冊</th>${eb ? `<th class="r">電子の価格</th><th class="r">電子の予定数</th><th class="r">電子の手取り/冊</th>` : ""}<th>手数料</th><th></th></tr></thead>
+  <tbody>${rows || `<tr><td class="dash" colspan="${eb ? 10 : 7}">まだ頒布先を選んでいません</td></tr>`}</tbody></table></div>
+  <p class="warn" data-out="overplan"></p>
+  <div class="acts">${unused.length ? `<select id="c-pick" aria-label="登録済みの頒布先">${unused.map(c => `<option value="${c.id}">${esc(c.name)}（${TYPES[c.type].label}）</option>`).join("")}</select><button class="btn" data-act="link">＋ この頒布先で頒布する</button>`
+    : `<span class="lead">${S.channels.length ? "登録済みの頒布先はすべて選んであります。" : "まだ頒布先がありません。"}</span>`}
+    <button class="ghost" data-act="tab" data-v="place">頒布先を登録しに行く</button></div>`;
+}
+
+function renderAlloc() {
+  const p = P(), r = calc(p);
+  const rows = p.chans.map(row => {
+    const ch = CH(row.ch); if (!ch) return "";
+    const a = allocOf(ch), others = S.products.filter(q => q.id !== p.id && q.chans.some(x => x.ch === ch.id));
+    return `<tr><td class="nw">${esc(ch.name)}</td><td class="out" data-out="rc3:${ch.id}">${yen(a.total)}</td><td>${others.length ? others.map(q => esc(q.name)).join("、") : "―"}</td>
+      <td class="r nw"><input type="number" class="pct" data-f="alloc:${ch.id}:${p.id}" value="${esc(ch.alloc[p.id] ?? "")}" placeholder="${Math.round(a.pct[p.id] || 0)}" aria-label="この頒布物の負担の％">%</td>
+      <td class="out" data-out="chc:${ch.id}">${yen(r.chCost[ch.id] || 0)}</td></tr>`;
+  }).join("");
+  $("secAlloc").innerHTML = `<div class="sec-h"><h2>頒布先の費用の分け方</h2><p class="lead">参加費や交通費など頒布先にかかる費用のうち、この頒布物が受け持つ分です。同じ頒布先で一緒に頒布する頒布物があれば、予定の手取りの割合で自動で分けます。自分で決めたいときは％を入れてください。</p></div>
+  ${rows ? `<div class="tbl-wrap"><table class="t"><thead><tr><th>頒布先</th><th class="r">頒布先の費用</th><th>一緒に頒布する頒布物</th><th class="r">この頒布物の負担</th><th class="r">この頒布物の分</th></tr></thead><tbody>${rows}</tbody>
+  <tfoot><tr><td colspan="4">頒布物の費用 ${yen(r.own)} ＋ 頒布先の費用 ${yen(r.chTotal)}</td><td class="out" data-out="total">${yen(r.total)}</td></tr></tfoot></table></div>
+  <p class="warn" data-out="allocover"></p>` : `<p class="lead">頒布先を選ぶと、ここに出ます。</p>`}
+  <p class="lead" data-out="distnote">${r.distOff && r.distSum ? `頒布物タブの「頒布にかかる費用（かんたん用）」${yen(r.distSum)}は、頒布先を選んだので入れていません。` : ""}</p>`;
+}
+
+function byChHTML() {
+  const p = P(), r = calc(p);
+  if (!p.chans.length) return `<div class="sec-h"><h2>頒布先ごとの収支</h2><p class="lead">頒布先を選ぶと、ここに出ます。</p></div>`;
+  const act = p.track;
+  const rows = p.chans.map(row => {
+    const ch = CH(row.ch); if (!ch) return "";
+    const x = chanNets(row), cost = r.chCost[ch.id] || 0;
+    const planNet = x.pn * n(row.pn) + (p.ebook ? x.en * n(row.en) : 0), planQ = n(row.pn) + (p.ebook ? n(row.en) : 0);
+    const unit = planQ ? planNet / planQ : (x.pn || x.en);
+    const need = cost && unit > 0 ? Math.ceil(cost / unit) + "部" : cost ? "―" : "0部";
+    const left = planNet - cost, gq = r.perCh[ch.id] || 0, gn = r.perNet[ch.id] || 0, gl = gn - cost;
+    const col = v => `style="color:${v >= 0 ? "var(--good)" : "var(--bad)"}"`;
+    return `<tr><td class="nw">${esc(ch.name)}</td><td class="out">${yen(cost)}</td><td class="out">${need}</td><td class="out">${planQ}部</td><td class="out" ${col(left)}>${left >= 0 ? "+" : "−"}${yen(Math.abs(left))}</td>
+      ${act ? `<td class="out">${gq}部</td><td class="out" ${gq ? col(gl) : ""}>${gq ? (gl >= 0 ? "+" : "−") + yen(Math.abs(gl)) : "―"}</td>` : ""}</tr>`;
+  }).join("");
+  return `<div class="sec-h"><h2>頒布先ごとの収支</h2><p class="lead">頒布先ごとに、手取りからその頒布先の費用（参加費・交通費などのこの頒布物の分）を引いた額です。本を作る費用は入れていないので、「このイベントに出て得だったか」を見るのに使います。</p></div>
+  <div class="tbl-wrap"><table class="t"><thead><tr><th>頒布先</th><th class="r">頒布先の費用</th><th class="r">費用を回収する部数</th><th class="r">予定数</th><th class="r">予定の残り</th>${act ? `<th class="r">頒布した数</th><th class="r">実際の残り</th>` : ""}</tr></thead><tbody>${rows}</tbody></table></div>
+  <p class="lead">本全体で元が取れたかは、上の「ペイできるか」${act ? "と下の「実績」" : ""}で、作る費用と頒布先の費用をあわせて見ます。</p>`;
+}
+function payHTML() {
+  const p = P(), r = calc(p);
+  const paperShare = r.planN ? r.planPaper / r.planN : 1;
+  const beBad = r.be != null && r.be * paperShare > r.sellable && r.sellable > 0;
+  const t1 = r.be == null ? `<div class="tile main"><span class="k">元が取れる部数</span><span class="v">―</span><span class="d">頒布先に価格と予定数を入れると出ます</span></div>`
+    : `<div class="tile ${beBad ? "bad" : "main"}"><span class="k">元が取れる部数</span><span class="v">${r.be}<small>部</small></span><span class="d">${p.ebook ? "紙と電子をあわせて、" : ""}予定の頒布先の割合で頒布した場合${r.sellable ? `／売れる紙 ${r.sellable}部` : ""}</span>${beBad ? `<span class="warn">売れる紙の部数を超えています。価格か部数を見直してください</span>` : ""}</div>`;
+  const t2 = `<div class="tile"><span class="k">1冊あたりの手取り（平均）</span><span class="v">${r.avg ? yen(r.avg) : "―"}</span><span class="d">手数料を引いた額の平均</span></div>`;
+  const t3 = `<div class="tile ${r.planN ? (r.profit >= 0 ? "good" : "bad") : ""}"><span class="k">予定どおり頒布できたら</span><span class="v">${r.planN ? (r.profit >= 0 ? "+" : "−") + yen(Math.abs(r.profit)) : "―"}</span><span class="d">${r.planN ? `${r.planN}部・手取り ${yen(r.planRev)} − 費用 ${yen(r.total)}` : ""}</span></div>`;
+  return `<div class="sec-h"><h2>ペイできるか</h2><p class="lead">頒布物の費用と頒布先の費用をあわせた合計を、手数料を引いた1冊あたりの手取りで割って出しています。</p></div>
+  <div class="tiles">${t1}${t2}${t3}</div>${chartSVG(r)}`;
+}
+function chartSVG(r) {
+  if (!r.avg || !r.total) return "";
+  const maxX = Math.ceil(Math.max(r.planN, r.be || 0, 10) * 1.15), maxY = Math.max(r.total, r.avg * maxX) * 1.12;
+  const W = 900, H = 270, L = 74, R = 20, T = 16, B = 40;
+  const X = v => L + (W - L - R) * v / maxX, Y = v => H - B - (H - T - B) * v / maxY;
+  const raw = maxY / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 5, 10].map(k => k * mag).find(s => s >= raw);
+  const ys = []; for (let v = 0; v <= maxY; v += step) ys.push(v);
+  const be = r.be, lx = maxX * 0.62;
+  const beX = be != null ? Math.min(Math.max(X(be), L + 70), W - R - 70) : 0;
+  return `<div class="chart" role="img" aria-label="売れた部数と手取りの累計のグラフ"><svg viewBox="0 0 ${W} ${H}">
+    ${ys.map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end" font-size="12" fill="var(--sub)">${(v / 10000).toLocaleString("ja-JP")}万円</text>`).join("")}
+    <path d="M${X(0)},${Y(0)} L${X(maxX)},${Y(r.avg * maxX)} L${X(maxX)},${Y(0)} Z" fill="var(--accent)" opacity=".1"/>
+    <line x1="${X(0)}" y1="${Y(0)}" x2="${X(maxX)}" y2="${Y(r.avg * maxX)}" stroke="var(--accent)" stroke-width="2.5"/>
+    <text x="${X(lx) + 6}" y="${Y(r.avg * lx) + 20}" font-size="13" fill="var(--accent-ink)">手取りの累計</text>
+    <line x1="${L}" x2="${W - R}" y1="${Y(r.total)}" y2="${Y(r.total)}" stroke="var(--bad)" stroke-width="2" stroke-dasharray="6 4"/>
+    <text x="${L + 6}" y="${Y(r.total) - 7}" font-size="13" fill="var(--bad)">費用 ${yen(r.total)}</text>
+    ${be != null ? `<line x1="${X(be)}" x2="${X(be)}" y1="${Y(r.total)}" y2="${H - B}" stroke="var(--ink)" stroke-dasharray="2 3"/><circle cx="${X(be)}" cy="${Y(r.total)}" r="5" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/><text x="${beX}" y="${H - 8}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">${be}部で元が取れる</text>` : ""}
+    <text x="${L}" y="${H - B + 16}" font-size="12" fill="var(--sub)">0部</text><text x="${W - R}" y="${H - B + 16}" text-anchor="end" font-size="12" fill="var(--sub)">${maxX}部</text>
+  </svg></div>`;
+}
+function renderActual() {
+  const p = P();
+  const box = $("secActual");
+  const chk = `<label class="chk"><input type="checkbox" data-f="p.track" ${p.track ? "checked" : ""}>実績も記録する</label>`;
+  if (!p.track) { box.innerHTML = `<div class="sec-h"><h2>実績</h2><p class="lead">頒布したあとに、頒布した部数を記録して元が取れたかと在庫を見られます。使うときはチェックを入れてください。</p></div>${chk}`; return; }
+  const chs = p.chans.map(r => CH(r.ch)).filter(Boolean);
+  const rows = p.sales.map(s => {
+    const ch = CH(s.ch);
+    return `<tr><td><input type="date" data-f="sale:${s.id}:date" value="${esc(s.date)}" class="req ${s.date ? "" : "bad"}" aria-label="日付（必須）"></td>
+    <td><select data-f="sale:${s.id}:ch" data-re="1" aria-label="頒布先">${chs.map(c => `<option value="${c.id}" ${c.id === s.ch ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></td>
+    <td><select data-f="sale:${s.id}:kind" data-re="1" aria-label="内容"><option value="sell" ${s.kind !== "send" ? "selected" : ""}>頒布</option><option value="send" ${s.kind === "send" ? "selected" : ""}>納品</option></select></td>
+    <td>${p.ebook && s.kind !== "send" ? `<select data-f="sale:${s.id}:form" data-re="1" aria-label="紙か電子か"><option value="paper" ${s.form !== "ebook" ? "selected" : ""}>紙</option><option value="ebook" ${s.form === "ebook" ? "selected" : ""}>電子</option></select>` : "紙"}</td>
+    <td class="r"><input type="number" class="req" data-f="sale:${s.id}:qty" value="${esc(s.qty)}" inputmode="numeric" aria-label="部数"></td>
+    <td class="r">${s.kind === "send" ? "―" : `<input type="number" class="req" data-f="sale:${s.id}:price" value="${esc(s.price)}" inputmode="numeric" aria-label="単価">`}</td>
+    <td class="out" data-out="sale:${s.id}">${s.kind === "send" || !ch ? "―" : yen(net(s.form === "ebook" ? ch.ebook : ch.paper, s.price) * n(s.qty))}</td>
+    <td class="w-x"><button class="x" data-act="delSale" data-id="${s.id}" aria-label="この記録を消す">×</button></td></tr>`;
+  }).join("");
+  box.innerHTML = `<div class="sec-h"><h2>実績</h2><p class="lead">頒布した日・頒布先・部数・単価を記録します。日付は必須です（年ごとの集計に使います）。書店委託や倉庫に送った分は「納品」、委託先から届いた精算書の売れた数は「頒布」で入れてください。</p></div>${chk}
+  <div class="tbl-wrap"><table class="t"><thead><tr><th>日付</th><th>頒布先</th><th>内容</th><th>紙/電子</th><th class="r">部数</th><th class="r">単価</th><th class="r">手取り</th><th></th></tr></thead>
+  <tbody>${rows || `<tr><td class="dash" colspan="8">まだ記録がありません</td></tr>`}</tbody></table></div>
+  <div class="acts">${chs.length ? `<button class="btn" data-act="addSale">＋ 記録を足す</button>` : `<span class="lead">先に「頒布先ごとの価格と部数」で頒布先を足してください</span>`}</div>
+  <div id="actualSum"></div>`;
+  renderActualSum();
+}
+function renderActualSum() {
+  const p = P(), el = $("actualSum"); if (!el) return;
+  const r = calc(p);
+  const rate = r.total ? Math.min(100, Math.round(r.got / r.total * 100)) : 0;
+  const shops = Object.entries(r.atShop).filter(([, v]) => v > 0).map(([id, v]) => `${esc(CH(id)?.name)} <b>${v}部</b>`).join("　");
+  const next = r.remain > 0 ? p.chans.map(row => { const ch = CH(row.ch); const x = chanNets(row); if (!ch || !x.pn) return ""; return `<tr><td>${esc(ch.name)}</td><td class="out">${yen(n(row.pp))}</td><td class="out">${Math.ceil(r.remain / x.pn)}部</td></tr>`; }).join("") : "";
+  el.innerHTML = `<div class="tiles">
+    <div class="tile ${r.remain <= 0 && r.total ? "good" : "main"}"><span class="k">${r.remain <= 0 && r.total ? "元が取れました" : "元が取れるまで"}</span><span class="v">${r.remain <= 0 ? "+" + yen(-r.remain) : yen(r.remain)}</span><span class="d">手取り ${yen(r.got)} − 費用 ${yen(r.total)}</span><div class="bar" aria-label="回収率 ${rate}%"><i style="width:${rate}%"></i></div><span class="d">回収率 ${rate}%</span></div>
+    <div class="tile"><span class="k">頒布した数</span><span class="v">${r.sold}<small>部</small></span><span class="d">${Object.entries(r.perCh).map(([id, v]) => `${esc(CH(id)?.name)} ${v}部`).join("・") || "―"}</span></div>
+    <div class="tile"><span class="k">紙の在庫</span><span class="v">${r.hand + r.inShops}<small>部</small></span><span class="d">手元 ${r.hand}部${r.inShops ? `・委託先 ${r.inShops}部` : ""}</span></div></div>
+  ${shops ? `<p class="stock">委託先にある部数：${shops}</p>` : ""}
+  ${r.undated ? `<p class="warn">日付のない記録が${r.undated}件あります。日付を入れるまで計算に入りません。</p>` : ""}
+  ${r.hand < 0 ? `<p class="warn">手元の在庫がマイナスです。作った数か記録を確かめてください。</p>` : ""}
+  ${next ? `<h3>残りを頒布先ごとの価格で頒布するなら</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>頒布先</th><th class="r">紙の価格</th><th class="r">元が取れるまであと</th></tr></thead><tbody>${next}</tbody></table></div>` : ""}`;
+}
+
+function renderShare() {
+  $("secShare").innerHTML = `<div class="sec-h"><h2>結果を画像にする</h2><p class="lead">頒布の結果をXなどで共有するための画像を作ります。金額を隠すと、部数と割合だけが載ります。画像を長押し（PCは右クリック）して保存してください。</p></div>
+  <div class="acts"><label class="chk"><input type="checkbox" id="sh-hide" ${S.hideMoney !== false ? "checked" : ""}>金額を隠す</label><button class="btn" data-act="share">画像を作る</button></div>
+  <div id="shareOut"></div>`;
+}
+
+function renderHelp() {
+  $("helpBody").innerHTML = `
+  <div><h3>このツールでできること</h3><p>同人誌やグッズを作るのにかかった費用を整理して、1冊の原価と「いくらで何部頒布したら元が取れるか」を出します。頒布したあとは実績を入れて、元が取れたかと在庫を確かめられます。費用と価格だけ入れて、かんたんに試算する使い方もできます。</p></div>
+  <div><h3>青い枠のマス</h3><p>青い枠のマスが、計算に必要な最低限の欄です。頒布物タブなら、名前・作った数・印刷費・価格の4つを入れれば、かんたん試算が使えます。ほかの欄は、必要なときだけ入れてください。</p></div>
+  <div><h3>3つのタブ</h3><ul>
+    <li><b>頒布物</b>：本やグッズごとの費用と作った数を入れます。価格を入れると「1冊あたり残る額」と「元が取れる部数」が出ます（かんたん試算）。参加費や交通費も「頒布にかかる費用（かんたん用）」に入れれば、ここだけで試算できます。</li>
+    <li><b>頒布先</b>：イベント・書店委託・自家通販・電子のみの頒布先を登録します。手数料と、参加費・交通費などその頒布先にかかる費用はここで入れます。</li>
+    <li><b>計画と収支</b>：頒布物と頒布先を組み合わせる場所です。どの頒布先でいくらで何部頒布するか、頒布先の費用をどう分けるか、元が取れる部数、実績を扱います。</li></ul></div>
+  <div><h3>はじめて使うとき</h3><ol>
+    <li>「頒布物」タブで、名前と作った数、費用を入れます。最初に出ているサンプルは、上の「サンプルを消して新しく始める」で消せます。最後の1つの頒布物を消したときも、すべて消えてサンプルの状態に戻ります。</li>
+    <li>「かんたん試算」に価格を入れて、1冊あたり残る額を見ます。委託や通販で売るなら、手数料（%）も入れるとざっくり引けます。</li>
+    <li>イベントや委託も含めて考えたいときは、「頒布先」タブで頒布先を登録します。</li>
+    <li>「計画と収支」タブで、頒布先ごとの価格と予定数を入れます。</li>
+    <li>頒布したあとは、「計画と収支」タブの「実績」で記録します。</li></ol></div>
+  <div><h3>かんたん用の頒布費用と、頒布先の費用</h3><p>参加費や交通費を入れる場所は2つあります。パッと試算するときは頒布物タブの「頒布にかかる費用（かんたん用）」、イベントや委託ごとに分けて考えるときは「頒布先」タブです。二重に数えないように、計画と収支タブでその頒布物に頒布先を1つでも選ぶと、かんたん用の頒布費用は計画と収支の計算から外れます。外れている間は、費用の分類に「計画と収支では使っていません」と表示され、金額に線が引かれます。頒布物タブのかんたん試算には、いつでも入っています。</p></div>
+  <div><h3>1冊の原価と、頒布にかかる費用</h3><p>費用は「作る費用」（印刷費・画材など）と「頒布にかかる費用」（参加費・交通費など）に分けて扱います。1冊の原価は作る費用 ÷ 作った数で出すので、在庫をあとのイベントに持っていっても、すでに頒布した本の原価は変わりません。頒布にかかる費用は「計画と収支」タブの「頒布先ごとの収支」で、頒布先ごとに手取りと比べます。本全体で元が取れたかは、両方をあわせた「ペイできるか」と「実績」で見ます。</p></div>
+  <div><h3>頒布先の費用の分け方</h3><p>C109に新刊を2冊持っていくときも、参加費や交通費は「頒布先」タブで1回入れるだけです。2冊への分け方は「計画と収支」タブの「頒布先の費用の分け方」で決まります。初期値は予定の手取りの割合で、自分で％を決めることもできます。</p></div>
+  <div><h3>手数料の考え方</h3><ul>
+    <li>イベント：手数料なし。価格がそのまま手取りです。</li>
+    <li>BOOTH：(価格＋送料)×5.6%＋45円がかかります（2025年10月28日の改定後）。このツールでは送料を除いて計算しています。倉庫から発送する場合はさらに価格×2.5%＋1個25円がかかります。</li>
+    <li>書店委託：店頭価格×掛け率が手取りです。掛け率は契約で違うので、「頒布先」タブで自分の値に直してください。初期値は目安の70%です。</li>
+    <li>手数料は変わることがあります。最新の値は各サービスの公式ページで確かめてください。</li></ul></div>
+  <div><h3>実績と在庫</h3><p>「計画と収支」タブの「実績」で「実績も記録する」にチェックを入れると使えます。日付は必須です。書店委託や倉庫に送った分は「納品」、委託先から届いた精算書の売れた数は「頒布」で入れると、手元と委託先の在庫を分けて数えます。</p></div>
+  <div><h3>保存について</h3><p>記録はこのブラウザに自動で保存されます。ブラウザのデータを消すと記録も消えるので、ときどき「保存と読み込み」の「書き出す」で控えを取ってください。<b>この画面は試作版です。</b></p></div>`;
+}
+
+function renderAll() {
+  renderBand(); renderTabs(); renderMgmt();
+  $("secPick1").innerHTML = pickHTML("pick1"); $("secPick3").innerHTML = pickHTML("pick3");
+  renderInfo(); renderCost(); renderTry(); renderPlaces(); renderCh(); renderAlloc();
+  $("secPay").innerHTML = payHTML(); $("secByCh").innerHTML = byChHTML(); renderActual(); renderShare(); renderHelp(); renderOuts();
+}
+// 入力中は表を描き直さず、計算結果だけ差し替える
+function renderOuts() {
+  const p = P(), r = calc(p);
+  renderBand();
+  const set = (k, v) => document.querySelectorAll(`[data-out="${k}"]`).forEach(el => { el.textContent = v; });
+  CATS.forEach(c => set("cat:" + c.key, yen(catSum(p, c.key))));
+  set("ownQuick", yen(r.ownQuick));
+  set("make", yen(r.make));
+  set("unitMake", r.qty ? yen(r.unitPrint) + "／" + yen(r.unitMake) : "作った数を入れてください");
+  set("distnote", r.distOff && r.distSum ? `頒布物タブの「頒布にかかる費用（かんたん用）」${yen(r.distSum)}は、頒布先を選んだので入れていません。` : "");
+  p.chans.forEach(row => { const ch = CH(row.ch); if (!ch) return; const x = chanNets(row);
+    set("chc:" + ch.id, yen(r.chCost[ch.id] || 0)); set("pn:" + ch.id, row.pp ? yen(x.pn) : "―"); set("en:" + ch.id, row.ep ? yen(x.en) : "―"); });
+  S.channels.forEach(ch => { const a = allocOf(ch); ["rc", "rc2", "rc3"].forEach(k => set(`${k}:${ch.id}`, yen(a.total)));
+    const inp = document.querySelector(`[data-f="alloc:${ch.id}:${p.id}"]`); if (inp) inp.placeholder = Math.round(a.pct[p.id] || 0); });
+  set("total", yen(r.total));
+  set("allocover", p.chans.some(row => CH(row.ch) && allocOf(CH(row.ch)).over) ? "手で入れた負担の合計が100%を超えている頒布先があります。" : "");
+  set("overplan", r.sellable && r.planPaper > r.sellable ? `紙の予定数の合計（${r.planPaper}部）が、売れる紙の部数（${r.sellable}部）を超えています。` : "");
+  p.sales.forEach(s => { const ch = CH(s.ch); set("sale:" + s.id, s.kind === "send" || !ch ? "―" : yen(net(s.form === "ebook" ? ch.ebook : ch.paper, s.price) * n(s.qty))); });
+  $("secPay").innerHTML = payHTML(); $("secByCh").innerHTML = byChHTML();
+  renderTryOut(); renderActualSum();
+  document.querySelectorAll('[data-f^="sale:"][data-f$=":date"]').forEach(el => el.classList.toggle("bad", !el.value));
+}
+
+/* ── 入力 ── */
+function setField(path, el) {
+  const p = P();
+  const v = el.type === "checkbox" ? el.checked : el.value;
+  const [kind, a, b, c] = path.split(":");
+  const numish = s => (s === "" ? "" : Number(s));
+  if (kind.startsWith("p.")) { const k = kind.slice(2); p[k] = ["pages", "qty", "keep", "tryPrice", "tryFee"].includes(k) ? numish(v) : v; }
+  else if (kind === "cost") { const x = p.costs.find(x => x.id === a); if (!x) return; x[b] = b === "paid" ? !!v : ["amount", "share"].includes(b) ? numish(v) : v; }
+  else if (kind === "pch") { const row = p.chans.find(r => r.ch === a); if (row) row[b] = numish(v); }
+  else if (kind === "ch") { const ch = CH(a); if (ch) ch[b] = v; }
+  else if (kind === "chfee") { const ch = CH(a); if (ch && ch[b]) ch[b][c] = c === "mode" ? v : numish(v); }
+  else if (kind === "chcost") { const ch = CH(a); const x = ch?.costs.find(x => x.id === b); if (x) x[c] = c === "amount" ? numish(v) : v; }
+  else if (kind === "alloc") { const ch = CH(a); if (ch) { if (v === "") delete ch.alloc[b]; else ch.alloc[b] = Number(v); } }
+  else if (kind === "sale") { const s = p.sales.find(s => s.id === a); if (!s) return; s[b] = ["qty", "price"].includes(b) ? numish(v) : v;
+    if (b === "ch" || b === "form") { const row = p.chans.find(r => r.ch === s.ch); if (row) s.price = s.form === "ebook" ? row.ep : row.pp; } }
+  save();
+}
+document.addEventListener("input", e => {
+  const el = e.target; if (!el.dataset.f || el.tagName === "SELECT" || el.type === "checkbox") return;
+  setField(el.dataset.f, el);
+  renderOuts();
+});
+document.addEventListener("change", e => {
+  const el = e.target;
+  if (el.dataset.pick) { S.current = el.value; save(); renderAll(); return; }
+  if (el.id === "sh-hide") { S.hideMoney = el.checked; save(); return; }
+  if (el.id === "m-prog") { readProgress(el.files[0]); return; }
+  if (el.dataset.f && (el.tagName === "SELECT" || el.type === "checkbox")) { setField(el.dataset.f, el); renderAll(); }
+  else if (el.dataset.f && (el.dataset.f.startsWith("ch:") || el.dataset.f.startsWith("p.name"))) renderAll();
+});
+document.addEventListener("toggle", e => {
+  const d = e.target;
+  if (d.dataset?.cat) catOpen.set(d.dataset.cat, d.open);
+  if (d.dataset?.roster) d.open ? openRoster.add(d.dataset.roster) : openRoster.delete(d.dataset.roster);
+}, true);
+
+let armed = null;
+function arm(btn, label, fn) {
+  if (armed === btn.id) { armed = null; fn(); return; }
+  armed = btn.id; btn.classList.add("armed"); btn.textContent = label;
+  setTimeout(() => { if (armed === btn.id) { armed = null; renderAll(); } }, 3000);
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const p = P(), act = b.dataset.act;
+  if (act === "help") { $("helpBox").open = true; $("helpBox").scrollIntoView({ behavior: "smooth" }); return; }
+  if (act === "tab") { S.tab = b.dataset.v; save(); renderTabs(); window.scrollTo({ top: 0 }); return; }
+  if (act === "goPlace") { S.tab = "place"; openRoster.add(b.dataset.id); save(); renderAll(); $("place-" + b.dataset.id)?.scrollIntoView({ block: "center" }); return; }
+  if (act === "addBook" || act === "addGoods") { const x = newProduct(act === "addBook" ? "book" : "goods"); x.color = COLORS[S.products.length % COLORS.length]; S.products.push(x); S.current = x.id; S.tab = "item"; }
+  else if (act === "dup") { const x = JSON.parse(JSON.stringify(p)); x.id = uid(); x.name += "（複製）"; x.sales = []; x.costs.forEach(c => { c.id = uid(); }); S.products.push(x); S.current = x.id; }
+  else if (act === "del") { if (S.products.length < 2) return arm(b, "もう一度押すと、頒布先も含めてすべて消してサンプルの状態に戻します", () => { S = sample(); save(); renderAll(); window.scrollTo({ top: 0 }); });
+    return arm(b, "もう一度押すと消します", () => { S.products = S.products.filter(x => x.id !== p.id); S.channels.forEach(ch => delete ch.alloc[p.id]); S.current = S.products[0].id; save(); renderAll(); }); }
+  else if (act === "fresh") { const x = newProduct("book"); S = { products: [x], channels: [], current: x.id, sample: false, tab: "item" }; }
+  else if (act === "reset") return arm(b, "もう一度押すとサンプルに戻します", () => { S = sample(); save(); renderAll(); });
+  else if (act === "color") p.color = b.dataset.v;
+  else if (act === "addCost") { p.costs.push({ id: uid(), cat: b.dataset.cat, name: "", amount: "", paid: false, share: "", memo: "" }); catOpen.set(p.id + ":" + b.dataset.cat, true); }
+  else if (act === "delCost") p.costs = p.costs.filter(x => x.id !== b.dataset.id);
+  else if (act === "link") { const id = $("c-pick")?.value; if (!id) return; p.chans.push({ ch: id, pp: "", pn: "", ep: "", en: "" }); }
+  else if (act === "newCh") { const ch = newChannel($("c-newtype").value, $("c-newname").value.trim()); S.channels.push(ch); openRoster.add(ch.id); }
+  else if (act === "unlink") { p.chans = p.chans.filter(r => r.ch !== b.dataset.id); const ch = CH(b.dataset.id); if (ch) delete ch.alloc[p.id]; }
+  else if (act === "addSale") { const row = p.chans[0]; p.sales.push({ id: uid(), date: today(), ch: row.ch, kind: "sell", form: "paper", qty: "", price: row.pp }); }
+  else if (act === "delSale") p.sales = p.sales.filter(s => s.id !== b.dataset.id);
+  else if (act === "addChCost") { CH(b.dataset.ch).costs.push({ id: uid(), name: "", amount: "" }); openRoster.add(b.dataset.ch); }
+  else if (act === "delChCost") { const ch = CH(b.dataset.ch); ch.costs = ch.costs.filter(c => c.id !== b.dataset.id); }
+  else if (act === "delCh") { const id = b.dataset.id; if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "もう一度押すと消します（計画と実績からも外れます）"; return; }
+    S.channels = S.channels.filter(c => c.id !== id); S.products.forEach(x => { x.chans = x.chans.filter(r => r.ch !== id); x.sales = x.sales.filter(s => s.ch !== id); }); }
+  else if (act === "export") { $("m-io").value = JSON.stringify({ format: "doujin-shushi", version: 1, data: S }); $("m-io").select(); try { navigator.clipboard.writeText($("m-io").value).then(() => { b.textContent = "コピーしました"; }, () => {}); } catch (_) {} return; }
+  else if (act === "import") { try { const o = JSON.parse($("m-io").value); if (o.format !== "doujin-shushi" || !o.data?.products) throw 0; S = o.data; S.sample = false; save(); renderAll(); } catch (_) { b.textContent = "読み込めませんでした。書き出した内容をそのまま貼ってください"; } return; }
+  else if (act === "share") { makeShare(); return; }
+  else return;
+  save(); renderAll();
+});
+
+function readProgress(file) {
+  if (!file) return;
+  const fr = new FileReader();
+  fr.onload = () => {
+    try {
+      const o = JSON.parse(fr.result); const bk = o.book; if (o.format !== "doujin-progress" || !bk) throw 0;
+      const x = newProduct("book", bk.title || "読み込んだ本"); x.color = bk.color || COLORS[0];
+      x.pages = (bk.rows || []).reduce((a, r) => a + n(r.pc), 0) || "";
+      if (bk.event) { let ch = S.channels.find(c => c.name === bk.event); if (!ch) { ch = newChannel("event", bk.event); ch.date = bk.eventDate || ""; S.channels.push(ch); } x.chans.push({ ch: ch.id, pp: "", pn: "", ep: "", en: "" }); }
+      S.products.push(x); S.current = x.id; S.sample = false; save(); renderAll();
+    } catch (_) { alertLine("執筆進捗管理表の書き出しファイルではないようです"); }
+  };
+  fr.readAsText(file);
+}
+function alertLine(msg) { const el = $("m-io"); if (el) el.value = msg; }
+
+/* ── 共有画像 ── */
+async function makeShare() {
+  const p = P(), r = calc(p), hide = $("sh-hide").checked;
+  try { await document.fonts.ready; } catch (_) {}
+  const W = 1200, H = 675, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const g = cv.getContext("2d"), fg = fgFor(p.color);
+  const disp = '"Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif', body = '"Zen Kaku Gothic New","Hiragino Sans",sans-serif';
+  g.fillStyle = "#fbfaf7"; g.fillRect(0, 0, W, H);
+  g.fillStyle = p.color; g.fillRect(0, 0, W, 150);
+  g.fillStyle = fg; g.font = `500 26px ${body}`; g.fillText(p.track && p.sales.length ? "頒布の記録" : "頒布の試算", 60, 56);
+  g.font = `900 46px ${disp}`;
+  let title = p.name; while (g.measureText(title).width > W - 120 && title.length > 4) title = title.slice(0, -2) + "…";
+  g.fillText(title, 60, 116);
+  const actual = p.track && p.sales.length;
+  g.fillStyle = "#1f1d1b";
+  let head, rate;
+  if (actual) { rate = r.total ? Math.min(1, r.got / r.total) : 0; head = r.remain <= 0 ? "元が取れました！" : `${r.sold}部 頒布しました`; }
+  else head = r.be ? `${r.be}部で元が取れる計算` : "試算中";
+  g.font = `900 64px ${disp}`; g.fillText(head, 60, 250);
+  // 進み具合の棒
+  const bx = 60, by = 285, bw = W - 120, bh = 30;
+  g.fillStyle = "#e4e0da"; roundRect(g, bx, by, bw, bh, 15); g.fill();
+  if (actual) { g.fillStyle = r.remain <= 0 ? "#2f8a5b" : p.color; roundRect(g, bx, by, Math.max(bh, bw * rate), bh, 15); g.fill();
+    g.fillStyle = "#6b6560"; g.font = `500 24px ${body}`; g.fillText(`回収率 ${Math.round((r.total ? r.got / r.total : 0) * 100)}%`, bx, by + 70); }
+  else if (r.be) { g.fillStyle = p.color; roundRect(g, bx, by, Math.max(bh, bw * Math.min(1, r.be / Math.max(r.planN, r.be))), bh, 15); g.fill();
+    g.fillStyle = "#6b6560"; g.font = `500 24px ${body}`; g.fillText(`予定 ${r.planN}部のうち ${r.be}部で元が取れる`, bx, by + 70); }
+  // 頒布先ごと
+  g.font = `500 28px ${body}`; g.fillStyle = "#1f1d1b";
+  let y = 430;
+  const list = actual ? Object.entries(r.perCh).map(([id, v]) => [CH(id)?.name || "", v]) : p.chans.map(row => [CH(row.ch)?.name || "", n(row.pn) + (p.ebook ? n(row.en) : 0)]);
+  list.slice(0, 4).forEach(([nm, v]) => { g.fillText(nm, 60, y); g.textAlign = "right"; g.fillText(`${v}部`, 620, y); g.textAlign = "left"; y += 46; });
+  if (!hide) { g.font = `500 26px ${body}`; g.fillStyle = "#6b6560";
+    g.fillText(`費用 ${yen(r.total)}`, 700, 430); g.fillText(actual ? `手取り ${yen(r.got)}` : `予定の手取り ${yen(r.planRev)}`, 700, 476);
+    if (r.qty) g.fillText(`1冊の原価 ${yen(r.unitMake)}`, 700, 522); }
+  // ツール名はいつも入れる
+  g.fillStyle = p.color; g.fillRect(0, H - 8, W, 8);
+  g.fillStyle = "#6b6560"; g.font = `700 24px ${disp}`; g.textAlign = "right"; g.fillText(`${TOOL}で計算`, W - 40, H - 32); g.textAlign = "left";
+  $("shareOut").innerHTML = `<img class="shareimg" alt="${esc(p.name)}の収支の画像" src="${cv.toDataURL("image/png")}">`;
+}
+function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+
+load(); renderAll();
+</script>
+
+<script>
+// ホーム画面に追加したあと、ネットなしでも開けるようにする
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
