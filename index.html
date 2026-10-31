@@ -155,6 +155,10 @@ tr.here td{background:var(--accent-soft)}
 .bar i{display:block;height:100%;background:var(--good)}
 .stock{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px}
 .stock b{font-family:var(--f-num);font-weight:500}
+#secActual table.t input[type=number]{width:4.6rem}
+#secActual table.t input[type=text]{min-width:6rem}
+#secActual table.t input[type=date]{width:9rem}
+#secActual table.t select{min-width:0;max-width:10rem}
 
 /* 共有画像 */
 .shareimg{max-width:100%;border:1px solid var(--line);border-radius:8px}
@@ -364,11 +368,13 @@ function calc(p) {
   const be = avg > 0 ? Math.ceil(total / avg) : null;
   // 実績
   // 納品した先（書店委託・倉庫）で売れた分は委託先の在庫から、それ以外は手元から減らす
-  let got = 0, sold = 0, sentOut = 0, soldHome = 0; const perCh = {}, perNet = {}, atShop = {};
+  // 無料で渡した分（交換・献本・自分用）は、売らない数を超えた分だけ手元から減らす
+  let got = 0, sold = 0, sentOut = 0, soldHome = 0, given = 0; const perCh = {}, perNet = {}, atShop = {};
   const dated = p.sales.filter(s => s.date), undated = p.sales.length - dated.length;
   const away = new Set(dated.filter(s => s.kind === "send").map(s => s.ch));
   S.channels.forEach(c => { if (c.type === "shop") away.add(c.id); });
   dated.forEach(s => {
+    if (s.kind === "give") { given += n(s.qty); return; }
     const ch = CH(s.ch); if (!ch) return;
     const q = n(s.qty);
     if (s.kind === "send") { sentOut += q; atShop[ch.id] = (atShop[ch.id] || 0) + q; return; }
@@ -379,9 +385,10 @@ function calc(p) {
     if (away.has(ch.id)) atShop[ch.id] = (atShop[ch.id] || 0) - q; else soldHome += q;
   });
   const inShops = Object.values(atShop).reduce((a, b) => a + Math.max(0, b), 0);
-  const hand = sellable - sentOut - soldHome;
+  const keep = Math.min(qty, n(p.keep)), givenOver = Math.max(0, given - keep);
+  const hand = sellable - sentOut - soldHome - givenOver;
   return { own, ownQuick, distSum, distOff, unitQuick: qty ? ownQuick / qty : 0, print, chCost, chTotal, total, qty, sellable, planRev, planN, planPaper, avg, be, profit: planRev - total,
-    unitPrint: qty ? print / qty : 0, unitOwn: qty ? own / qty : 0, unitAll: qty ? total / qty : 0, make: ownQuick - distSum, unitMake: qty ? (ownQuick - distSum) / qty : 0, got, sold, perCh, perNet, atShop, hand, inShops, remain: total - got, undated };
+    unitPrint: qty ? print / qty : 0, unitOwn: qty ? own / qty : 0, unitAll: qty ? total / qty : 0, make: ownQuick - distSum, unitMake: qty ? (ownQuick - distSum) / qty : 0, got, sold, perCh, perNet, atShop, hand, inShops, remain: total - got, undated, given, keep, givenOver };
 }
 
 /* ── 描画 ── */
@@ -443,7 +450,7 @@ function renderInfo() {
     ${p.kind === "book" ? `<div class="field"><label for="i-size">判型</label><input type="text" id="i-size" data-f="p.size" value="${esc(p.size)}" placeholder="B5"></div>
     <div class="field"><label for="i-pages">ページ数</label><input type="number" id="i-pages" data-f="p.pages" value="${esc(p.pages)}" inputmode="numeric" placeholder="44"></div>` : ""}
     <div class="field"><label for="i-qty">作った数（${p.kind === "book" ? "印刷部数" : "製作数"}）</label><input type="number" id="i-qty" data-f="p.qty" value="${esc(p.qty)}" inputmode="numeric" class="req" placeholder="200"></div>
-    <div class="field"><label for="i-keep">売らない数</label><input type="number" id="i-keep" data-f="p.keep" value="${esc(p.keep)}" inputmode="numeric" placeholder="10"><span class="hint">献本・見本・保存用など</span></div>
+    <div class="field"><label for="i-keep">売らない数</label><input type="number" id="i-keep" data-f="p.keep" value="${esc(p.keep)}" inputmode="numeric" placeholder="10"><span class="hint">献本・交換・見本・保存用など</span></div>
     <div class="field"><label for="i-printer">印刷所・メモ</label><input type="text" id="i-printer" data-f="p.printer" value="${esc(p.printer)}"></div>
     <div class="field"><span class="k">帯の色</span><div class="acts">${COLORS.map(c => `<button class="x" data-act="color" data-v="${c}" aria-label="色 ${c}" style="width:26px;height:26px;border-radius:50%;background:${c};border:2px solid ${c === p.color ? "var(--ink)" : "var(--panel)"};box-shadow:0 0 0 1px var(--line)"></button>`).join("")}</div></div>
   </div>
@@ -633,19 +640,20 @@ function renderActual() {
   if (!p.track) { box.innerHTML = `<div class="sec-h"><h2>実績</h2><p class="lead">頒布したあとに、頒布した部数を記録して元が取れたかと在庫を見られます。使うときはチェックを入れてください。</p></div>${chk}`; return; }
   const chs = p.chans.map(r => CH(r.ch)).filter(Boolean);
   const rows = p.sales.map(s => {
-    const ch = CH(s.ch);
+    const ch = CH(s.ch), give = s.kind === "give", sell = s.kind !== "send" && !give;
     return `<tr><td><input type="date" data-f="sale:${s.id}:date" value="${esc(s.date)}" class="req ${s.date ? "" : "bad"}" aria-label="日付（必須）"></td>
-    <td><select data-f="sale:${s.id}:ch" data-re="1" aria-label="頒布先">${chs.map(c => `<option value="${c.id}" ${c.id === s.ch ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></td>
-    <td><select data-f="sale:${s.id}:kind" data-re="1" aria-label="内容"><option value="sell" ${s.kind !== "send" ? "selected" : ""}>頒布</option><option value="send" ${s.kind === "send" ? "selected" : ""}>納品</option></select></td>
-    <td>${p.ebook && s.kind !== "send" ? `<select data-f="sale:${s.id}:form" data-re="1" aria-label="紙か電子か"><option value="paper" ${s.form !== "ebook" ? "selected" : ""}>紙</option><option value="ebook" ${s.form === "ebook" ? "selected" : ""}>電子</option></select>` : "紙"}</td>
+    <td><select data-f="sale:${s.id}:ch" data-re="1" aria-label="頒布先">${give ? `<option value="" ${CH(s.ch) ? "" : "selected"}>なし</option>` : ""}${chs.map(c => `<option value="${c.id}" ${c.id === s.ch ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></td>
+    <td><select data-f="sale:${s.id}:kind" data-re="1" aria-label="内容"><option value="sell" ${sell ? "selected" : ""}>頒布</option><option value="send" ${s.kind === "send" ? "selected" : ""}>納品</option><option value="give" ${give ? "selected" : ""}>無料で渡した</option></select></td>
+    <td>${p.ebook && sell ? `<select data-f="sale:${s.id}:form" data-re="1" aria-label="紙か電子か"><option value="paper" ${s.form !== "ebook" ? "selected" : ""}>紙</option><option value="ebook" ${s.form === "ebook" ? "selected" : ""}>電子</option></select>` : "紙"}</td>
     <td class="r"><input type="number" class="req" data-f="sale:${s.id}:qty" value="${esc(s.qty)}" inputmode="numeric" aria-label="部数"></td>
-    <td class="r">${s.kind === "send" ? "―" : `<input type="number" class="req" data-f="sale:${s.id}:price" value="${esc(s.price)}" inputmode="numeric" aria-label="単価">`}</td>
-    <td class="out" data-out="sale:${s.id}">${s.kind === "send" || !ch ? "―" : yen(net(s.form === "ebook" ? ch.ebook : ch.paper, s.price) * n(s.qty))}</td>
+    <td class="r">${!sell ? "―" : `<input type="number" class="req" data-f="sale:${s.id}:price" value="${esc(s.price)}" inputmode="numeric" aria-label="単価">`}</td>
+    <td class="out" data-out="sale:${s.id}">${!sell || !ch ? "―" : yen(net(s.form === "ebook" ? ch.ebook : ch.paper, s.price) * n(s.qty))}</td>
+    <td><input type="text" data-f="sale:${s.id}:memo" value="${esc(s.memo)}" placeholder="${give ? "例：交換・献本" : ""}" aria-label="メモ"></td>
     <td class="w-x"><button class="x" data-act="delSale" data-id="${s.id}" aria-label="この記録を消す">×</button></td></tr>`;
   }).join("");
-  box.innerHTML = `<div class="sec-h"><h2>実績</h2><p class="lead">頒布した日・頒布先・部数・単価を記録します。日付は必須です（年ごとの集計に使います）。書店委託や倉庫に送った分は「納品」、委託先から届いた精算書の売れた数は「頒布」で入れてください。</p></div>${chk}
-  <div class="tbl-wrap"><table class="t"><thead><tr><th>日付</th><th>頒布先</th><th>内容</th><th>紙/電子</th><th class="r">部数</th><th class="r">単価</th><th class="r">手取り</th><th></th></tr></thead>
-  <tbody>${rows || `<tr><td class="dash" colspan="8">まだ記録がありません</td></tr>`}</tbody></table></div>
+  box.innerHTML = `<div class="sec-h"><h2>実績</h2><p class="lead">頒布した日・頒布先・部数・単価を記録します。日付は必須です（年ごとの集計に使います）。書店委託や倉庫に送った分は「納品」、委託先から届いた精算書の売れた数は「頒布」、交換・献本・自分用など無料で渡した分は「無料で渡した」で入れてください。</p></div>${chk}
+  <div class="tbl-wrap"><table class="t"><thead><tr><th>日付</th><th>頒布先</th><th>内容</th><th>紙/電子</th><th class="r">部数</th><th class="r">単価</th><th class="r">手取り</th><th>メモ</th><th></th></tr></thead>
+  <tbody>${rows || `<tr><td class="dash" colspan="9">まだ記録がありません</td></tr>`}</tbody></table></div>
   <div class="acts">${chs.length ? `<button class="btn" data-act="addSale">＋ 記録を足す</button>` : `<span class="lead">先に「頒布先ごとの価格と部数」で頒布先を足してください</span>`}</div>
   <div id="actualSum"></div>`;
   renderActualSum();
@@ -661,6 +669,7 @@ function renderActualSum() {
     <div class="tile"><span class="k">頒布した数</span><span class="v">${r.sold}<small>部</small></span><span class="d">${Object.entries(r.perCh).map(([id, v]) => `${esc(CH(id)?.name)} ${v}部`).join("・") || "―"}</span></div>
     <div class="tile"><span class="k">紙の在庫</span><span class="v">${r.hand + r.inShops}<small>部</small></span><span class="d">手元 ${r.hand}部${r.inShops ? `・委託先 ${r.inShops}部` : ""}</span></div></div>
   ${shops ? `<p class="stock">委託先にある部数：${shops}</p>` : ""}
+  ${r.given ? `<p class="lead">無料で渡した ${r.given}部（売らない予定 ${r.keep}部のうち）。${r.givenOver ? `予定を超えた${r.givenOver}部は、手元の在庫から引いています。` : "売らない数の範囲なので、在庫は変わりません。"}</p>` : ""}
   ${r.undated ? `<p class="warn">日付のない記録が${r.undated}件あります。日付を入れるまで計算に入りません。</p>` : ""}
   ${r.hand < 0 ? `<p class="warn">手元の在庫がマイナスです。作った数か記録を確かめてください。</p>` : ""}
   ${next ? `<h3>残りを頒布先ごとの価格で頒布するなら</h3><div class="tbl-wrap"><table class="t"><thead><tr><th>頒布先</th><th class="r">紙の価格</th><th class="r">元が取れるまであと</th></tr></thead><tbody>${next}</tbody></table></div>` : ""}`;
@@ -694,7 +703,7 @@ function renderHelp() {
     <li>BOOTH：(価格＋送料)×5.6%＋45円がかかります（2025年10月28日の改定後）。このツールでは送料を除いて計算しています。倉庫から発送する場合はさらに価格×2.5%＋1個25円がかかります。</li>
     <li>書店委託：店頭価格×掛け率が手取りです。掛け率は契約で違うので、「頒布先」タブで自分の値に直してください。初期値は目安の70%です。</li>
     <li>手数料は変わることがあります。最新の値は各サービスの公式ページで確かめてください。</li></ul></div>
-  <div><h3>実績と在庫</h3><p>「計画と収支」タブの「実績」で「実績も記録する」にチェックを入れると使えます。日付は必須です。書店委託や倉庫に送った分は「納品」、委託先から届いた精算書の売れた数は「頒布」で入れると、手元と委託先の在庫を分けて数えます。</p></div>
+  <div><h3>実績と在庫</h3><p>「計画と収支」タブの「実績」で「実績も記録する」にチェックを入れると使えます。日付は必須です。書店委託や倉庫に送った分は「納品」、委託先から届いた精算書の売れた数は「頒布」で入れると、手元と委託先の在庫を分けて数えます。交換・献本・自分用などお金をもらわずに渡した分は「無料で渡した」で入れます。頒布先は「なし」も選べます。渡した数が頒布物の情報の「売らない数」を超えたら、超えた分だけ手元の在庫から引きます（売らない数の分は、もともと売れる部数に入っていないため）。頒布した数や共有画像の部数には入りません。</p></div>
   <div><h3>保存について</h3><p>記録はこのブラウザに自動で保存されます。ブラウザのデータを消すと記録も消えるので、ときどき「保存と読み込み」の「書き出す」で控えを取ってください。<b>この画面は試作版です。</b></p></div>`;
 }
 
@@ -721,7 +730,7 @@ function renderOuts() {
   set("total", yen(r.total));
   set("allocover", p.chans.some(row => CH(row.ch) && allocOf(CH(row.ch)).over) ? "手で入れた負担の合計が100%を超えている頒布先があります。" : "");
   set("overplan", r.sellable && r.planPaper > r.sellable ? `紙の予定数の合計（${r.planPaper}部）が、売れる紙の部数（${r.sellable}部）を超えています。` : "");
-  p.sales.forEach(s => { const ch = CH(s.ch); set("sale:" + s.id, s.kind === "send" || !ch ? "―" : yen(net(s.form === "ebook" ? ch.ebook : ch.paper, s.price) * n(s.qty))); });
+  p.sales.forEach(s => { const ch = CH(s.ch); set("sale:" + s.id, s.kind === "send" || s.kind === "give" || !ch ? "―" : yen(net(s.form === "ebook" ? ch.ebook : ch.paper, s.price) * n(s.qty))); });
   $("secPay").innerHTML = payHTML(); $("secByCh").innerHTML = byChHTML();
   renderTryOut(); renderActualSum();
   document.querySelectorAll('[data-f^="sale:"][data-f$=":date"]').forEach(el => el.classList.toggle("bad", !el.value));
@@ -741,7 +750,9 @@ function setField(path, el) {
   else if (kind === "chcost") { const ch = CH(a); const x = ch?.costs.find(x => x.id === b); if (x) x[c] = c === "amount" ? numish(v) : v; }
   else if (kind === "alloc") { const ch = CH(a); if (ch) { if (v === "") delete ch.alloc[b]; else ch.alloc[b] = Number(v); } }
   else if (kind === "sale") { const s = p.sales.find(s => s.id === a); if (!s) return; s[b] = ["qty", "price"].includes(b) ? numish(v) : v;
-    if (b === "ch" || b === "form") { const row = p.chans.find(r => r.ch === s.ch); if (row) s.price = s.form === "ebook" ? row.ep : row.pp; } }
+    if (b === "kind" && v === "give") s.form = "paper";
+    if (b === "kind" && v !== "give" && !CH(s.ch) && p.chans[0]) s.ch = p.chans[0].ch;
+    if (b === "ch" || b === "form" || b === "kind") { const row = p.chans.find(r => r.ch === s.ch); if (row) s.price = s.form === "ebook" ? row.ep : row.pp; } }
   save();
 }
 document.addEventListener("input", e => {
