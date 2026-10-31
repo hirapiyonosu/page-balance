@@ -819,7 +819,12 @@ function alertLine(msg) { const el = $("m-io"); if (el) el.value = msg; }
 /* ── 共有画像 ── */
 async function makeShare() {
   const p = P(), r = calc(p), hide = $("sh-hide").checked;
-  try { await document.fonts.ready; } catch (_) {}
+  // 画像に使う文字のフォントを先に読み込む（日本語フォントは文字ごとに分かれて届くため）
+  try {
+    const txt = makeShare.toString() + p.name + S.channels.map(c => c.name).join("") + TOOL + "0123456789,+-%…";
+    await Promise.all(["900 64px \"Zen Maru Gothic\"", "500 24px \"Zen Kaku Gothic New\"", "700 24px \"Zen Maru Gothic\""].map(f => document.fonts.load(f, txt)));
+    await document.fonts.ready;
+  } catch (_) {}
   const W = 1200, H = 675, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
   const g = cv.getContext("2d"), fg = fgFor(p.color);
   const disp = '"Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif', body = '"Zen Kaku Gothic New","Hiragino Sans",sans-serif';
