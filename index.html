@@ -156,6 +156,7 @@ tr.here td{background:var(--accent-soft)}
 .stock{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px}
 .stock b{font-family:var(--f-num);font-weight:500}
 #secActual table.t input[type=number]{width:4.6rem}
+#secActual table.t input[data-f$=":price"]{width:5.8rem}
 #secActual table.t input[type=text]{min-width:6rem}
 #secActual table.t input[type=date]{width:9rem}
 #secActual table.t select{min-width:0;max-width:10rem}
@@ -165,14 +166,15 @@ tr.here td{background:var(--accent-soft)}
 textarea.io{width:100%;min-height:7rem;font-family:var(--f-num);font-size:12px}
 
 /* タブ：押せる形（枠＋影）、開いているタブは青 */
-.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--bandh,64px));z-index:5;background:var(--paper);padding:8px 0;margin:-8px 0}
+html{scroll-padding-top:calc(var(--bandh,64px) + 90px)}
 .tab{font:inherit;text-align:left;display:grid;gap:1px;background:var(--panel);color:var(--ink);border:1.5px solid var(--btn-line);border-radius:10px;padding:8px 12px;cursor:pointer;box-shadow:var(--btn-shadow)}
 .tab b{font-family:var(--f-display);font-size:16px}
 .tab span{font-size:12px;color:var(--sub)}
 .tab:hover{border-color:var(--accent)}
 .tab.on{border:2px solid var(--accent);background:var(--accent-soft);color:var(--accent-ink);box-shadow:none}
 .tab:active{transform:translateY(1px)}
-@media (max-width:520px){.tab{padding:6px 8px}.tab b{font-size:14px}.tab span{font-size:11px;line-height:1.35}}
+@media (max-width:520px){.tab{padding:6px 8px}.tab b{font-size:14px}.tab span{display:none}}
 .pane{display:grid;gap:22px}
 .wrap>*,.pane>*,section.card>*,.card-body>*,.inner>*{min-width:0}
 .pick{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:end}
@@ -391,6 +393,11 @@ function calc(p) {
     unitPrint: qty ? print / qty : 0, unitOwn: qty ? own / qty : 0, unitAll: qty ? total / qty : 0, make: ownQuick - distSum, unitMake: qty ? (ownQuick - distSum) / qty : 0, got, sold, perCh, perNet, atShop, hand, inShops, remain: total - got, undated, given, keep, givenOver };
 }
 
+/* 目標：売れる部数の何%で元を取るか（初期値50%） */
+const targetPct = p => { const v = n(p.target); return v > 0 && v <= 100 ? v : 50; };
+const targetN = (p, r) => r.sellable ? Math.max(1, Math.ceil(r.sellable * targetPct(p) / 100)) : 0;
+const targetField = (p, id) => `<div class="field"><label for="${id}">目標：売れる部数の何%で元を取るか</label><input type="number" id="${id}" data-f="p.target" value="${esc(p.target)}" inputmode="numeric" placeholder="50" style="max-width:7rem"><span class="hint">空欄は50%。2つのタブで同じ値を使います</span></div>`;
+
 /* ── 描画 ── */
 const $ = id => document.getElementById(id);
 function fgFor(hex) { const h = hex.replace("#", ""); const r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16); return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? "#1f1d1b" : "#ffffff"; }
@@ -414,7 +421,11 @@ function renderBand() {
     <div class="now"><div><span>費用の合計</span><b>${yen(r.total)}</b></div><div><span>1冊の原価</span><b>${r.qty ? yen(r.unitMake) : "―"}</b></div>${last}</div>
     <button class="helpbtn" data-act="help">使い方</button></div>`;
   $("sampleNote").hidden = !S.sample;
+  syncBandH();
 }
+// 帯の高さに合わせて、タブを帯のすぐ下に止める
+function syncBandH() { const h = $("band").offsetHeight; if (h) document.documentElement.style.setProperty("--bandh", h + "px"); }
+window.addEventListener("resize", syncBandH);
 
 function renderTabs() {
   const t = tab();
@@ -491,7 +502,8 @@ function renderTry() {
   const p = P();
   $("secTry").innerHTML = `<div class="sec-h"><h2>かんたん試算</h2><p class="lead">価格を入れると、1冊あたりいくら残るか（価格 − 1冊の原価）と、何部頒布すれば元が取れるか（上の費用すべてを回収できるか。かんたん用の頒布費用も含む）が出ます。委託や通販の手数料をざっくり引きたいときは手数料に％を入れてください。頒布先ごとにきちんと分けて考えるときは「計画と収支」タブを使います。</p></div>
   <div class="form"><div class="field"><label for="t-price">価格</label><input type="number" id="t-price" class="req" data-f="p.tryPrice" value="${esc(p.tryPrice)}" inputmode="numeric" placeholder="500"></div>
-    <div class="field"><label for="t-fee">手数料（%）</label><input type="number" id="t-fee" data-f="p.tryFee" value="${esc(p.tryFee)}" inputmode="decimal" placeholder="0"><span class="hint">イベントの手売りだけなら空欄</span></div></div>
+    <div class="field"><label for="t-fee">手数料（%）</label><input type="number" id="t-fee" data-f="p.tryFee" value="${esc(p.tryFee)}" inputmode="decimal" placeholder="0"><span class="hint">イベントの手売りだけなら空欄</span></div>
+    ${targetField(p, "t-target")}</div>
   <div id="tryOut"></div>`;
   renderTryOut();
 }
@@ -506,7 +518,10 @@ function renderTryOut() {
   el.innerHTML = `<div class="tiles">
     <div class="tile ${left >= 0 ? "main" : "bad"}"><span class="k">1冊あたり残る額</span><span class="v">${left >= 0 ? "" : "−"}${yen(Math.abs(left))}</span><span class="d">${fee ? `手取り ${yen(take)}（手数料${fee}%）` : `価格 ${yen(price)}`} − 1冊の原価 ${yen(r.unitMake)}</span></div>
     <div class="tile ${over ? "bad" : ""}"><span class="k">元が取れる部数</span><span class="v">${back}<small>部</small></span><span class="d">${r.sellable ? `売れる部数 ${r.sellable}部のうち ${Math.round(back / r.sellable * 100)}%` : ""}</span>${over ? `<span class="warn">売れる部数を超えています</span>` : ""}</div>
-    <div class="tile ${all >= 0 ? "good" : "bad"}"><span class="k">売り切ったら</span><span class="v">${all >= 0 ? "+" : "−"}${yen(Math.abs(all))}</span><span class="d">${r.sellable}部 × ${yen(take)} − 費用 ${yen(r.ownQuick)}</span></div></div>
+    <div class="tile ${all >= 0 ? "good" : "bad"}"><span class="k">売り切ったら</span><span class="v">${all >= 0 ? "+" : "−"}${yen(Math.abs(all))}</span><span class="d">${r.sellable}部 × ${yen(take)} − 費用 ${yen(r.ownQuick)}</span></div>
+    ${(() => { const tn = targetN(p, r); if (!tn || !r.ownQuick || fee >= 100) return "";
+      const needTake = r.ownQuick / tn, needPrice = Math.ceil(needTake / ((100 - fee) / 100) / 10) * 10, ok = price >= needPrice;
+      return `<div class="tile ${ok ? "good" : ""}"><span class="k">${targetPct(p)}%（${tn}部）で元が取れる価格</span><span class="v">${yen(needPrice)}</span><span class="d">${fee ? `手取り ${yen(Math.ceil(needTake))}／冊が必要（手数料${fee}%）。` : ""}${ok ? "入れた価格で届いています" : `入れた価格からあと ${yen(needPrice - price)} 上げると届きます`}</span></div>`; })()}</div>
   <h3>価格ごとの早見表</h3>
   <div class="tbl-wrap"><table class="t"><thead><tr><th class="r">価格</th><th class="r">1冊あたり残る額</th><th class="r">元が取れる部数</th><th class="r">売れる部数のうち</th><th class="r">売り切ったら</th></tr></thead><tbody>
   ${prices.map(v => { const t = get(v), b = r.ownQuick && t > 0 ? Math.ceil(r.ownQuick / t) : 0, a = t * r.sellable - r.ownQuick, l = t - r.unitMake;
@@ -610,8 +625,15 @@ function payHTML() {
     : `<div class="tile ${beBad ? "bad" : "main"}"><span class="k">元が取れる部数</span><span class="v">${r.be}<small>部</small></span><span class="d">${p.ebook ? "紙と電子をあわせて、" : ""}予定の頒布先の割合で頒布した場合${r.sellable ? `／売れる紙 ${r.sellable}部` : ""}</span>${beBad ? `<span class="warn">売れる紙の部数を超えています。価格か部数を見直してください</span>` : ""}</div>`;
   const t2 = `<div class="tile"><span class="k">1冊あたりの手取り（平均）</span><span class="v">${r.avg ? yen(r.avg) : "―"}</span><span class="d">手数料を引いた額の平均</span></div>`;
   const t3 = `<div class="tile ${r.planN ? (r.profit >= 0 ? "good" : "bad") : ""}"><span class="k">予定どおり頒布できたら</span><span class="v">${r.planN ? (r.profit >= 0 ? "+" : "−") + yen(Math.abs(r.profit)) : "―"}</span><span class="d">${r.planN ? `${r.planN}部・手取り ${yen(r.planRev)} − 費用 ${yen(r.total)}` : ""}</span></div>`;
-  return `<div class="sec-h"><h2>ペイできるか</h2><p class="lead">頒布物の費用と頒布先の費用をあわせた合計を、手数料を引いた1冊あたりの手取りで割って出しています。</p></div>
-  <div class="tiles">${t1}${t2}${t3}</div>${chartSVG(r)}`;
+  const tn = targetN(p, r), need = tn && r.total ? r.total / tn : 0;
+  const t4 = need ? `<div class="tile ${r.avg >= need ? "good" : ""}"><span class="k">売れる紙の${targetPct(p)}%（${tn}部）で元を取るなら</span><span class="v">${yen(Math.ceil(need))}<small>／冊</small></span><span class="d">必要な1冊あたりの手取り。いまの平均は ${r.avg ? yen(r.avg) : "―"}${r.avg && r.avg < need ? `（あと ${yen(Math.ceil(need - r.avg))}）` : r.avg ? "で届いています" : ""}</span></div>` : "";
+  return `<div class="tiles">${t1}${t2}${t3}${t4}</div>${chartSVG(r)}`;
+}
+function renderPayHead() {
+  const p = P();
+  $("secPay").innerHTML = `<div class="sec-h"><h2>ペイできるか</h2><p class="lead">頒布物の費用と頒布先の費用をあわせた合計を、手数料を引いた1冊あたりの手取りで割って出しています。目標の割合を決めると、その部数で元を取るのに1冊あたりいくら手取りが必要かも出ます。</p></div>
+  <div class="form">${targetField(p, "pay-target")}</div><div id="payOut"></div>`;
+  $("payOut").innerHTML = payHTML();
 }
 function chartSVG(r) {
   if (!r.avg || !r.total) return "";
@@ -704,6 +726,8 @@ function renderHelp() {
     <li>書店委託：店頭価格×掛け率が手取りです。掛け率は契約で違うので、「頒布先」タブで自分の値に直してください。初期値は目安の70%です。</li>
     <li>手数料は変わることがあります。最新の値は各サービスの公式ページで確かめてください。</li></ul></div>
   <div><h3>実績と在庫</h3><p>「計画と収支」タブの「実績」で「実績も記録する」にチェックを入れると使えます。日付は必須です。書店委託や倉庫に送った分は「納品」、委託先から届いた精算書の売れた数は「頒布」で入れると、手元と委託先の在庫を分けて数えます。交換・献本・自分用などお金をもらわずに渡した分は「無料で渡した」で入れます。頒布先は「なし」も選べます。渡した数が頒布物の情報の「売らない数」を超えたら、超えた分だけ手元の在庫から引きます（売らない数の分は、もともと売れる部数に入っていないため）。頒布した数や共有画像の部数には入りません。</p></div>
+  <div><h3>目標：売れる部数の何%で元を取るか</h3><p>参加費や送料、委託の手数料まで含めて、売れる部数の何割を頒布できたら元が取れるようにしたいかを決める欄です（空欄は50%）。かんたん試算ではその割合で元が取れる価格を、計画と収支では必要な1冊あたりの手取りを出します。部数と価格を決めるときの目安に使ってください。</p></div>
+  <div><h3>画面の上のタブ</h3><p>「頒布物」「頒布先」「計画と収支」のタブは、下にスクロールしても帯のすぐ下に出たままなので、いつでも切り替えられます。</p></div>
   <div><h3>保存について</h3><p>記録はこのブラウザに自動で保存されます。ブラウザのデータを消すと記録も消えるので、ときどき「保存と読み込み」の「書き出す」で控えを取ってください。<b>この画面は試作版です。</b></p></div>`;
 }
 
@@ -711,7 +735,7 @@ function renderAll() {
   renderBand(); renderTabs(); renderMgmt();
   $("secPick1").innerHTML = pickHTML("pick1"); $("secPick3").innerHTML = pickHTML("pick3");
   renderInfo(); renderCost(); renderTry(); renderPlaces(); renderCh(); renderAlloc();
-  $("secPay").innerHTML = payHTML(); $("secByCh").innerHTML = byChHTML(); renderActual(); renderShare(); renderHelp(); renderOuts();
+  renderPayHead(); $("secByCh").innerHTML = byChHTML(); renderActual(); renderShare(); renderHelp(); renderOuts();
 }
 // 入力中は表を描き直さず、計算結果だけ差し替える
 function renderOuts() {
@@ -731,7 +755,8 @@ function renderOuts() {
   set("allocover", p.chans.some(row => CH(row.ch) && allocOf(CH(row.ch)).over) ? "手で入れた負担の合計が100%を超えている頒布先があります。" : "");
   set("overplan", r.sellable && r.planPaper > r.sellable ? `紙の予定数の合計（${r.planPaper}部）が、売れる紙の部数（${r.sellable}部）を超えています。` : "");
   p.sales.forEach(s => { const ch = CH(s.ch); set("sale:" + s.id, s.kind === "send" || s.kind === "give" || !ch ? "―" : yen(net(s.form === "ebook" ? ch.ebook : ch.paper, s.price) * n(s.qty))); });
-  $("secPay").innerHTML = payHTML(); $("secByCh").innerHTML = byChHTML();
+  if ($("payOut")) $("payOut").innerHTML = payHTML(); $("secByCh").innerHTML = byChHTML();
+  document.querySelectorAll('[data-f="p.target"]').forEach(el => { if (el !== document.activeElement) el.value = p.target ?? ""; });
   renderTryOut(); renderActualSum();
   document.querySelectorAll('[data-f^="sale:"][data-f$=":date"]').forEach(el => el.classList.toggle("bad", !el.value));
 }
@@ -742,7 +767,7 @@ function setField(path, el) {
   const v = el.type === "checkbox" ? el.checked : el.value;
   const [kind, a, b, c] = path.split(":");
   const numish = s => (s === "" ? "" : Number(s));
-  if (kind.startsWith("p.")) { const k = kind.slice(2); p[k] = ["pages", "qty", "keep", "tryPrice", "tryFee"].includes(k) ? numish(v) : v; }
+  if (kind.startsWith("p.")) { const k = kind.slice(2); p[k] = ["pages", "qty", "keep", "tryPrice", "tryFee", "target"].includes(k) ? numish(v) : v; }
   else if (kind === "cost") { const x = p.costs.find(x => x.id === a); if (!x) return; x[b] = b === "paid" ? !!v : ["amount", "share"].includes(b) ? numish(v) : v; }
   else if (kind === "pch") { const row = p.chans.find(r => r.ch === a); if (row) row[b] = numish(v); }
   else if (kind === "ch") { const ch = CH(a); if (ch) ch[b] = v; }
