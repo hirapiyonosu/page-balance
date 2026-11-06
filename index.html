@@ -507,6 +507,27 @@ function renderTry() {
   <div id="tryOut"></div>`;
   renderTryOut();
 }
+// イベントで売ったときと同じだけ残る、委託・通販の価格（10円単位で切り上げ）
+function sameTakeHTML(p, r, take) {
+  if (!(take > 0)) return "";
+  const own = S.channels.map(c => { const fee = c.paper || c.ebook; return fee && fee.mode !== "none" ? { name: c.name, fee } : null; }).filter(Boolean);
+  const list = own.length ? own : [
+    { name: "書店委託（目安：取り分70%）", fee: { mode: "rate", rate: 70 } },
+    { name: "BOOTH（自宅発送・電子）", fee: { mode: "booth" } },
+    { name: "BOOTH（倉庫発送）", fee: { mode: "boothwh" } },
+  ];
+  const need = Math.ceil(take);
+  const rows = list.map(x => {
+    let v = Math.ceil(need / 10) * 10, i = 0;
+    while (net(x.fee, v) < need && i++ < 2000) v += 10;
+    const got = net(x.fee, v);
+    return `<tr><td>${esc(x.name)}</td><td>${feeText(x.fee)}</td><td class="out"><b>${yen(v)}</b></td><td class="out">${yen(got)}</td><td class="out">${yen(got - r.unitMake)}</td></tr>`;
+  }).join("");
+  return `<h3>イベントと同じだけ残る、委託・通販の価格</h3>
+  <p class="lead">イベントで1冊売ったときの粗利（1冊あたり残る額 ${yen(take - r.unitMake)}）と同じだけ残るように、手数料を引いて逆算した価格です。10円単位で切り上げています。${own.length ? "「頒布先」タブで登録した手数料を使っています。" : "頒布先を登録すると、その手数料で計算します。"}</p>
+  <div class="tbl-wrap"><table class="t"><thead><tr><th>頒布先</th><th>手数料</th><th class="r">同じだけ残る価格</th><th class="r">手取り</th><th class="r">1冊あたり残る額</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <p class="lead">BOOTHの自宅発送は送料にも5.6%かかるので、送料を受け取る場合は実際に残る額が少し減ります。書店委託の取り分は契約で違うので、自分の値を頒布先に登録してください。</p>`;
+}
 function renderTryOut() {
   const p = P(), r = calc(p), el = $("tryOut"); if (!el) return;
   const price = n(p.tryPrice);
@@ -522,6 +543,7 @@ function renderTryOut() {
     ${(() => { const tn = targetN(p, r); if (!tn || !r.ownQuick || fee >= 100) return "";
       const needTake = r.ownQuick / tn, needPrice = Math.ceil(needTake / ((100 - fee) / 100) / 10) * 10, ok = price >= needPrice;
       return `<div class="tile ${ok ? "good" : ""}"><span class="k">${targetPct(p)}%（${tn}部）で元が取れる価格</span><span class="v">${yen(needPrice)}</span><span class="d">${fee ? `手取り ${yen(Math.ceil(needTake))}／冊が必要（手数料${fee}%）。` : ""}${ok ? "入れた価格で届いています" : `入れた価格からあと ${yen(needPrice - price)} 上げると届きます`}</span></div>`; })()}</div>
+  ${sameTakeHTML(p, r, take)}
   <h3>価格ごとの早見表</h3>
   <div class="tbl-wrap"><table class="t"><thead><tr><th class="r">価格</th><th class="r">1冊あたり残る額</th><th class="r">元が取れる部数</th><th class="r">売れる部数のうち</th><th class="r">売り切ったら</th></tr></thead><tbody>
   ${prices.map(v => { const t = get(v), b = r.ownQuick && t > 0 ? Math.ceil(r.ownQuick / t) : 0, a = t * r.sellable - r.ownQuick, l = t - r.unitMake;
@@ -727,6 +749,7 @@ function renderHelp() {
     <li>手数料は変わることがあります。最新の値は各サービスの公式ページで確かめてください。</li></ul></div>
   <div><h3>実績と在庫</h3><p>「計画と収支」タブの「実績」で「実績も記録する」にチェックを入れると使えます。日付は必須です。書店委託や倉庫に送った分は「納品」、委託先から届いた精算書の売れた数は「頒布」で入れると、手元と委託先の在庫を分けて数えます。交換・献本・自分用などお金をもらわずに渡した分は「無料で渡した」で入れます。頒布先は「なし」も選べます。渡した数が頒布物の情報の「売らない数」を超えたら、超えた分だけ手元の在庫から引きます（売らない数の分は、もともと売れる部数に入っていないため）。頒布した数や共有画像の部数には入りません。</p></div>
   <div><h3>目標：売れる部数の何%で元を取るか</h3><p>参加費や送料、委託の手数料まで含めて、売れる部数の何割を頒布できたら元が取れるようにしたいかを決める欄です（空欄は50%）。かんたん試算ではその割合で元が取れる価格を、計画と収支では必要な1冊あたりの手取りを出します。部数と価格を決めるときの目安に使ってください。</p></div>
+  <div><h3>イベントと同じだけ残る価格</h3><p>かんたん試算に価格を入れると、イベントで1冊売ったときの粗利（価格 − 1冊の原価）と同じだけ残るには、書店委託やBOOTHでいくらにすればよいかが出ます。手数料を引いて逆算し、10円単位で切り上げています。頒布先タブで手数料のある頒布先を登録していればその値で、なければ書店委託70%・BOOTH・BOOTH倉庫の目安で計算します。かんたん試算の手数料（%）に値を入れたときは、その手数料を引いたあとの額を基準にします。</p></div>
   <div><h3>画面の上のタブ</h3><p>「頒布物」「頒布先」「計画と収支」のタブは、下にスクロールしても帯のすぐ下に出たままなので、いつでも切り替えられます。</p></div>
   <div><h3>保存について</h3><p>記録はこのブラウザに自動で保存されます。ブラウザのデータを消すと記録も消えるので、ときどき「保存と読み込み」の「書き出す」で控えを取ってください。<b>この画面は試作版です。</b></p></div>`;
 }
