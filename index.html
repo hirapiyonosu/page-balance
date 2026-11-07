@@ -85,7 +85,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .band .now span{font-size:11px;opacity:.85}
 .band .now b{font-family:var(--f-num);font-size:20px;font-weight:500;white-space:nowrap}
 .band .helpbtn{font:inherit;font-size:13px;font-weight:700;background:transparent;color:inherit;border:1.5px solid currentColor;border-radius:999px;padding:4px 12px;cursor:pointer}
-@media (max-width:520px){.band h1{font-size:17px}.band .now b{font-size:17px}.band .now{gap:12px}}
+@media (max-width:520px){.band h1{font-size:17px}.band .now b{font-size:17px}.band .now{gap:12px}.band .eyebrow{display:none}}
 
 /* まとまり */
 section.card,details.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
@@ -93,6 +93,7 @@ section.card{padding:16px;display:grid;gap:12px}
 .sec-h{display:grid;gap:2px}
 details.card>summary{cursor:pointer;padding:12px 16px;font-family:var(--f-display);font-weight:700;font-size:16px;list-style:none;display:flex;justify-content:space-between;gap:8px;align-items:center}
 details.card>summary::-webkit-details-marker{display:none}
+details.card>summary small{font-family:var(--f-body);font-weight:400;font-size:12px;color:var(--sub);margin-left:6px}
 details.card>summary::after{content:"開く ▾";flex:none;font-family:var(--f-body);font-size:12px;font-weight:400;color:var(--sub)}
 details.card[open]>summary::after{content:"閉じる ▴"}
 .card-body{padding:0 16px 16px;display:grid;gap:16px}
@@ -199,7 +200,7 @@ html{scroll-padding-top:calc(var(--bandh,64px) + 90px)}
   </div>
 
   <details class="card" id="mgmt">
-    <summary>保存と読み込み</summary>
+    <summary><span>保存と読み込み<small>書き出し・読み込み・サンプルに戻す</small></span></summary>
     <div class="card-body" id="mgmtBody"></div>
   </details>
 
@@ -777,7 +778,7 @@ function renderHelp() {
   <div><h3>目標：売れる部数の何%で元を取るか</h3><p>参加費や送料、委託の手数料まで含めて、売れる部数の何割を頒布できたら元が取れるようにしたいかを決める欄です（空欄は50%）。かんたん試算ではその割合で元が取れる価格を、計画と収支では必要な1冊あたりの手取りを出します。部数と価格を決めるときの目安に使ってください。</p></div>
   <div><h3>イベントと同じだけ残る価格</h3><p>かんたん試算に価格を入れると、イベントで1冊売ったときの粗利（価格 − 1冊の原価）と同じだけ残るには、書店委託やBOOTHでいくらにすればよいかが出ます。手数料を引いて逆算し、10円単位で切り上げています。頒布先タブで手数料のある頒布先を登録していればその値で、なければ書店委託70%・BOOTH・BOOTH倉庫の目安で計算します。かんたん試算の手数料（%）に値を入れたときは、その手数料を引いたあとの額を基準にします。</p></div>
   <div><h3>画面の上のタブ</h3><p>「頒布物」「頒布先」「計画と収支」のタブは、下にスクロールしても帯のすぐ下に出たままなので、いつでも切り替えられます。</p></div>
-  <div><h3>保存について</h3><p>記録はこのブラウザに自動で保存されます。ブラウザのデータを消すと記録も消えるので、ときどき「保存と読み込み」の「ファイルに保存」で控えを取ってください。「文字をコピー」で文字として持ち出すこともできます。</p><p>読み込むときは、書き出したファイルを選ぶか、書き出した文字を貼り付けて「読み込む」を押します。今の記録は読み込んだ内容に置き換わるので、サンプル以外のときは2回押して確定します。結果は、押したボタンのすぐ横に出ます。<b>この画面は試作版です。</b></p></div>`;
+  <div><h3>保存について</h3><p>記録はこのブラウザに自動で保存されます。ブラウザのデータを消すと記録も消えるので、ときどき「保存と読み込み」の「ファイルに保存」で控えを取ってください。「文字をコピー」で文字として持ち出すこともできます。</p><p>読み込むときは、書き出したファイルを選ぶか、書き出した文字を貼り付けて「読み込む」を押します。今の記録は読み込んだ内容に置き換わるので、サンプル以外のときは2回押して確定します。結果は、押したボタンのすぐ横に出ます。</p></div>`;
 }
 
 function renderAll() {
