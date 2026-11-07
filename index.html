@@ -163,6 +163,8 @@ tr.here td{background:var(--accent-soft)}
 
 /* 共有画像 */
 .shareimg{max-width:100%;border:1px solid var(--line);border-radius:8px}
+.msg{font-size:13px;font-weight:700;color:var(--good)}
+.msg.bad{color:var(--bad)}
 textarea.io{width:100%;min-height:7rem;font-family:var(--f-num);font-size:12px}
 
 /* タブ：押せる形（枠＋影）、開いているタブは青 */
@@ -445,11 +447,35 @@ function renderMgmt() {
   <div class="field"><span class="k">執筆進捗管理表から読み込む</span>
     <span class="hint">進捗管理表で「書き出し」たファイルを選ぶと、タイトル・ページ数・本の色・イベントを取り込んで新しい頒布物を作ります。イベントは頒布先にも入ります。</span>
     <input type="file" id="m-prog" accept=".json,application/json"></div>
-  <div class="field"><span class="k">記録の書き出しと読み込み</span>
-    <span class="hint">記録はこのブラウザに自動で保存されます。別の端末に移すときは、書き出した文字をコピーして、移した先の欄に貼り付けて「読み込む」を押します。</span>
-    <div class="acts"><button class="ghost" data-act="export">書き出す</button><button class="ghost" data-act="import">貼り付けた内容を読み込む</button><button class="ghost danger" data-act="reset" id="resetBtn">サンプルに戻す</button></div>
-    <textarea class="io" id="m-io" placeholder="ここに書き出した内容が出ます。読み込むときはここに貼り付けてください。"></textarea></div>`;
+    <div class="field"><span class="k">記録を書き出す</span>
+    <span class="hint">記録はこのブラウザに自動で保存されます。ブラウザのデータを消すと記録も消えるので、ときどきファイルに保存して控えを取ってください。別の端末に移すときにも使います。</span>
+    <div class="acts"><button class="btn" data-act="exSave">ファイルに保存</button><button class="ghost" data-act="exCopy">文字をコピー</button><span class="msg" id="exMsg" role="status"></span></div>
+    <textarea class="io" id="exOut" readonly hidden></textarea></div>
+  <div class="field"><span class="k">記録を読み込む</span>
+    <span class="hint">書き出したファイルを選ぶか、書き出した文字を下に貼り付けて「読み込む」を押します。今の記録は、読み込んだ内容に置き換わります。</span>
+    <input type="file" id="imFile" accept=".json,application/json,text/plain">
+    <textarea class="io" id="m-io" placeholder="ここに書き出した文字を貼り付け"></textarea>
+    <div class="acts"><button class="btn" data-act="import" id="importBtn">読み込む</button><span class="msg" id="imMsg" role="status"></span></div></div>
+  <div class="field"><span class="k">サンプルに戻す</span>
+    <div class="acts"><button class="ghost danger" data-act="reset" id="resetBtn">サンプルに戻す</button><span class="lead">今の記録を消して、最初のサンプルの状態に戻します。</span></div></div>`;
 }
+const exportData = () => ({ format: "doujin-shushi", version: 1, data: S });
+const exportName = () => `同人誌収支ツール_${today()}.json`;
+// 書き出し・読み込み（3つのツール共通の形：ファイルに保存／文字をコピー、ファイルか貼り付けで読み込み。結果はボタンの横に出して数秒で消す）
+function ioMsg(id, text, bad) { const el = $(id); if (!el) return; el.textContent = text; el.className = "msg" + (bad ? " bad" : ""); clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = ""; }, bad ? 6000 : 4000); }
+async function saveFile(name, text) {
+  let dl = null; try { dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch (_) {}
+  if (dl) { await dl.save({ filename: name, data: text }); return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: "application/json" })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function readIn(file) { if (!file) return; const fr = new FileReader(); fr.onload = () => { $("m-io").value = fr.result; ioMsg("imMsg", "ファイルを読みました。「読み込む」を押してください"); }; fr.readAsText(file); }
+async function doExport(kind, b) {
+  const text = JSON.stringify(exportData());
+  if (kind === "save") { try { await saveFile(exportName(), text); ioMsg("exMsg", "ファイルに保存しました"); } catch (e) { if (!e || e.code !== "declined") ioMsg("exMsg", "保存できませんでした。「文字をコピー」を使ってください", true); } return; }
+  try { await navigator.clipboard.writeText(text); ioMsg("exMsg", "コピーしました"); }
+  catch (_) { const o = $("exOut"); o.hidden = false; o.value = text; o.select(); ioMsg("exMsg", "下の欄に出しました。選んでコピーしてください"); }
+}
+
 
 /* 頒布物タブ */
 function renderInfo() {
@@ -751,7 +777,7 @@ function renderHelp() {
   <div><h3>目標：売れる部数の何%で元を取るか</h3><p>参加費や送料、委託の手数料まで含めて、売れる部数の何割を頒布できたら元が取れるようにしたいかを決める欄です（空欄は50%）。かんたん試算ではその割合で元が取れる価格を、計画と収支では必要な1冊あたりの手取りを出します。部数と価格を決めるときの目安に使ってください。</p></div>
   <div><h3>イベントと同じだけ残る価格</h3><p>かんたん試算に価格を入れると、イベントで1冊売ったときの粗利（価格 − 1冊の原価）と同じだけ残るには、書店委託やBOOTHでいくらにすればよいかが出ます。手数料を引いて逆算し、10円単位で切り上げています。頒布先タブで手数料のある頒布先を登録していればその値で、なければ書店委託70%・BOOTH・BOOTH倉庫の目安で計算します。かんたん試算の手数料（%）に値を入れたときは、その手数料を引いたあとの額を基準にします。</p></div>
   <div><h3>画面の上のタブ</h3><p>「頒布物」「頒布先」「計画と収支」のタブは、下にスクロールしても帯のすぐ下に出たままなので、いつでも切り替えられます。</p></div>
-  <div><h3>保存について</h3><p>記録はこのブラウザに自動で保存されます。ブラウザのデータを消すと記録も消えるので、ときどき「保存と読み込み」の「書き出す」で控えを取ってください。<b>この画面は試作版です。</b></p></div>`;
+  <div><h3>保存について</h3><p>記録はこのブラウザに自動で保存されます。ブラウザのデータを消すと記録も消えるので、ときどき「保存と読み込み」の「ファイルに保存」で控えを取ってください。「文字をコピー」で文字として持ち出すこともできます。</p><p>読み込むときは、書き出したファイルを選ぶか、書き出した文字を貼り付けて「読み込む」を押します。今の記録は読み込んだ内容に置き換わるので、サンプル以外のときは2回押して確定します。結果は、押したボタンのすぐ横に出ます。<b>この画面は試作版です。</b></p></div>`;
 }
 
 function renderAll() {
@@ -812,6 +838,7 @@ document.addEventListener("change", e => {
   const el = e.target;
   if (el.dataset.pick) { S.current = el.value; save(); renderAll(); return; }
   if (el.id === "sh-hide") { S.hideMoney = el.checked; save(); return; }
+  if (el.id === "imFile") { readIn(el.files[0]); return; }
   if (el.id === "m-prog") { readProgress(el.files[0]); return; }
   if (el.dataset.f && (el.tagName === "SELECT" || el.type === "checkbox")) { setField(el.dataset.f, el); renderAll(); }
   else if (el.dataset.f && (el.dataset.f.startsWith("ch:") || el.dataset.f.startsWith("p.name"))) renderAll();
@@ -822,6 +849,8 @@ document.addEventListener("toggle", e => {
   if (d.dataset?.roster) d.open ? openRoster.add(d.dataset.roster) : openRoster.delete(d.dataset.roster);
 }, true);
 
+// ボタンの文字を一時的に変えて、少したったら元に戻す
+function flash(b, text, ms = 2500) { if (!b.dataset.label) b.dataset.label = b.textContent; b.textContent = text; clearTimeout(b._ft); b._ft = setTimeout(() => { b.textContent = b.dataset.label; delete b.dataset.label; }, ms); }
 let armed = null;
 function arm(btn, label, fn) {
   if (armed === btn.id) { armed = null; fn(); return; }
@@ -852,8 +881,12 @@ document.addEventListener("click", e => {
   else if (act === "delChCost") { const ch = CH(b.dataset.ch); ch.costs = ch.costs.filter(c => c.id !== b.dataset.id); }
   else if (act === "delCh") { const id = b.dataset.id; if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "もう一度押すと消します（計画と実績からも外れます）"; return; }
     S.channels = S.channels.filter(c => c.id !== id); S.products.forEach(x => { x.chans = x.chans.filter(r => r.ch !== id); x.sales = x.sales.filter(s => s.ch !== id); }); }
-  else if (act === "export") { $("m-io").value = JSON.stringify({ format: "doujin-shushi", version: 1, data: S }); $("m-io").select(); try { navigator.clipboard.writeText($("m-io").value).then(() => { b.textContent = "コピーしました"; }, () => {}); } catch (_) {} return; }
-  else if (act === "import") { try { const o = JSON.parse($("m-io").value); if (o.format !== "doujin-shushi" || !o.data?.products) throw 0; S = o.data; S.sample = false; save(); renderAll(); } catch (_) { b.textContent = "読み込めませんでした。書き出した内容をそのまま貼ってください"; } return; }
+  else if (act === "exSave" || act === "exCopy") { doExport(act === "exSave" ? "save" : "copy", b); return; }
+  else if (act === "import") { let o; try { o = JSON.parse($("m-io").value); if (o.format !== "doujin-shushi" || !o.data?.products) throw 0; } catch (_) { ioMsg("imMsg", "読み込めませんでした。書き出したファイルか、書き出した文字をそのまま全部入れてください", true); return; }
+    const go = () => { S = o.data; S.sample = false; save(); renderAll(); ioMsg("imMsg", "読み込みました"); };
+    if (S.sample || b.classList.contains("armed")) { go(); return; }
+    // 確認中も貼り付けた文字を消さないよう、描き直さずにボタンだけ戻す
+    b.classList.add("armed"); b.textContent = "もう一度押すと、今の記録を置き換えます"; setTimeout(() => { b.classList.remove("armed"); b.textContent = "読み込む"; }, 3000); return; }
   else if (act === "share") { makeShare(); return; }
   else return;
   save(); renderAll();
